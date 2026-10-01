@@ -1,0 +1,7 @@
+data/
+node_modules/
+.env
+*.log
+test-results/
+android/build/
+.DS_Store

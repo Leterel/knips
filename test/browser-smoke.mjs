@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { createKnips } from '../server/main.mjs';
+
+// PLAYWRIGHT_MODULE can point to an existing Playwright installation.
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(resolve(process.env.PLAYWRIGHT_MODULE)).href : 'playwright');
+const output = resolve('test-results/browser'); await mkdir(output, { recursive: true });
+const dataDir = await mkdtemp(join(output, 'data-'));
+const app = await createKnips({ dataDir });
+await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+const origin = `http://127.0.0.1:${app.server.address().port}`;
+let browser;
+try {
+  browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto(origin);
+  await page.locator('[name=username]').fill('browser_alice');
+  await page.locator('[name=displayName]').fill('Alice');
+  await page.locator('#password').fill('test-only-password-123');
+  await page.locator('#auth-submit').click(); await page.locator('#app').waitFor({ state: 'visible' });
+  await page.locator('#nav-new').click();
+  const png = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 320; c.height = 240; const x = c.getContext('2d'); x.fillStyle = '#702c42'; x.fillRect(0, 0, 320, 240); return c.toDataURL('image/png').split(',')[1]; });
+  await page.locator('#photo').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await page.locator('#caption').fill('<img src=x onerror=alert(1)> Browser-Test');
+  await page.locator('#post-submit').click(); await page.locator('.post').waitFor();
+  assert.equal(await page.locator('.post-caption img').count(), 0);
+  assert.match(await page.locator('.post-caption').innerText(), /Browser-Test/);
+  await page.reload(); await page.locator('.post').waitFor();
+  await page.locator('.like-button').click(); await page.locator('.like-button[aria-pressed=true]').waitFor();
+  await page.locator('[name=comment]').fill('Ein echter Kommentar');
+  await page.locator('.comment-form button').click(); await page.getByText('Ein echter Kommentar', { exact: false }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'mobile horizontal overflow');
+  await page.screenshot({ path: join(output, 'mobile-feed.png'), fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 900 }); await page.screenshot({ path: join(output, 'desktop-feed.png'), fullPage: true });
+  await page.locator('#nav-me').click(); await page.getByRole('button', { name: 'Konto löschen', exact: true }).waitFor();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Konto löschen', exact: true }).click();
+  await page.locator('dialog input').fill('test-only-password-123');
+  await page.getByRole('button', { name: 'Endgültig löschen', exact: true }).click();
+  await page.locator('#auth').waitFor({ state: 'visible' });
+  assert.deepEqual(errors, []);
+  console.log('PASS: real registration, image upload/re-encode, safe caption, reload/session, like, comment, mobile layout, account deletion.');
+} finally { await browser?.close(); await app.close(); await rm(dataDir, { recursive: true, force: true }); }
