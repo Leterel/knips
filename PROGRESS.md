@@ -40,3 +40,6 @@ bestehende Konten. Sechs HTTP/SQLite-Tests bestanden, einschließlich Rollen-/Bi
 Neuer mobiler Chrome-Test prüft Anmeldung, Bildansicht, sichere Textdarstellung,
 bestätigte Entfernung und aktualisierte Warteschlange. Der bisherige Browserablauf
 mit Upload/Like/Kommentar/Kontolöschung besteht ebenfalls. Keine neuen Gerätetests.
+
+Zusätzlich wurde ein unsigniertes Android-AAB gebaut (11.875 Bytes). BundleConfig,
+Manifest, DEX und Ressourcen sind vorhanden. Kein Play-Upload oder Produktionsschlüssel.

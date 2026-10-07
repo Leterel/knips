@@ -5,3 +5,9 @@ node_modules/
 test-results/
 android/build/
 .DS_Store
+
+android/.gradle/
+android/app/build/
+android/local.properties
+*.keystore
+*.jks
