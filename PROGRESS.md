@@ -20,8 +20,7 @@ Android-WebView-Client mit Serverauswahl und System-Dateiauswahl.
 
 ## Noch offen
 
-Android-Ende-zu-Ende-Test, insbesondere System-Dateiauswahl; öffentlicher HTTPS-Betrieb;
-Moderationsoberfläche und Betriebsrichtlinien; Play-Store-Paket und Werbeintegration.
+Öffentlicher HTTPS-Betrieb; Betriebsrichtlinien; Play-Store-Paket und Werbeintegration.
 Die bestehende APK vom 28.09. ist ein Entwicklungsbuild, kein Store-Release.
 
 ## Android-Emulator am 01.10.2026
@@ -32,3 +31,12 @@ im Feed wiedergefunden. Kein physisches Gerät verwendet. Andere Android-Version
 öffentlicher HTTPS-Betrieb und Android-Löschdialoge bleiben offen.
 Die oben genannte offene Android-Upload-Prüfung ist damit erledigt.
 Belege: outputs/knips/emulator-verification-20260928/oct01-* im Projekt-Arbeitsbereich.
+
+## 07.10.2026 — Moderation
+
+Geschützte Moderationsansicht mit gemeldeten Bildern und Gründen. Meldungen schließen
+oder den Beitrag entfernen; Rollen ausschließlich über Serverkonfiguration für
+bestehende Konten. Sechs HTTP/SQLite-Tests bestanden, einschließlich Rollen-/Bildzugriff.
+Neuer mobiler Chrome-Test prüft Anmeldung, Bildansicht, sichere Textdarstellung,
+bestätigte Entfernung und aktualisierte Warteschlange. Der bisherige Browserablauf
+mit Upload/Like/Kommentar/Kontolöschung besteht ebenfalls. Keine neuen Gerätetests.

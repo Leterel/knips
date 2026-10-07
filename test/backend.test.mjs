@@ -12,7 +12,7 @@ const password = 'test-only-passphrase-123';
 async function fixture(t) {
   const dataDir = await mkdtemp(join(tmpdir(), 'knips-test-'));
   let app, origin;
-  const start = async () => { app = await createKnips({ dataDir }); await new Promise(resolve => app.server.listen(0,'127.0.0.1',resolve)); origin = `http://127.0.0.1:${app.server.address().port}`; };
+  const start = async (options = {}) => { app = await createKnips({ dataDir, ...options }); await new Promise(resolve => app.server.listen(0,'127.0.0.1',resolve)); origin = `http://127.0.0.1:${app.server.address().port}`; };
   await start();
   t.after(async () => { await app.close(); await rm(dataDir,{recursive:true,force:true}); });
   async function request(path, { method='GET', cookie, body, headers={} }={}) {
@@ -22,8 +22,35 @@ async function fixture(t) {
   }
   async function register(username) { const result = await request('/api/register',{method:'POST',body:{username,displayName:username,password}}); assert.equal(result.status,201); return result.cookie; }
   async function post(cookie,caption='A real test image') { const result=await request('/api/posts',{method:'POST',cookie,body:{image:png,caption}}); assert.equal(result.status,201); return result.body.post; }
-  return { request, register, post, dataDir, origin: () => origin, async restart(){await app.close();await start();} };
+  return { request, register, post, dataDir, origin: () => origin, async restart(options){await app.close();await start(options);} };
 }
+
+test('moderators can review reports and remove content; ordinary accounts cannot', async t => {
+  const f = await fixture(t), moderator = await f.register('moderator'), alice = await f.register('alice'), bob = await f.register('bob');
+  await f.restart({ moderatorUsernames: ['moderator'] });
+  assert.equal((await f.request('/api/me', { cookie: moderator })).body.user.moderator, true);
+  assert.equal((await f.request('/api/moderation/reports', { cookie: bob })).status, 403);
+  const photo = await f.post(alice);
+  await f.request(`/api/posts/${photo.id}/report`, { method: 'POST', cookie: bob, body: { reason: 'Review this' } });
+  const reports = (await f.request('/api/moderation/reports', { cookie: moderator })).body.reports;
+  assert.equal(reports.length, 1); assert.equal(reports[0].author, 'alice');
+  assert.equal((await f.request(reports[0].image, { cookie: moderator })).status, 200);
+  assert.equal((await f.request(reports[0].image, { cookie: bob })).status, 403);
+  assert.equal((await f.request(reports[0].image)).status, 401);
+  const endpoint = `/api/moderation/reports/${reports[0].id}`;
+  assert.equal((await f.request(endpoint, { method: 'POST', cookie: alice, body: { action: 'remove-post' } })).status, 403);
+  assert.equal((await f.request(endpoint, { method: 'POST', cookie: moderator, body: { action: 'invalid' } })).status, 400);
+  assert.equal((await f.request(endpoint, { method: 'POST', cookie: moderator, body: { action: 'dismiss' } })).status, 200);
+  assert.equal((await f.request(photo.image, { cookie: alice })).status, 200);
+  await f.request(`/api/posts/${photo.id}/report`, { method: 'POST', cookie: bob, body: { reason: 'Review again' } });
+  const id = (await f.request('/api/moderation/reports', { cookie: moderator })).body.reports[0].id;
+  assert.equal((await f.request(`/api/moderation/reports/${id}`, { method: 'POST', cookie: moderator, body: { action: 'remove-post' } })).status, 200);
+  assert.equal((await f.request(photo.image, { cookie: alice })).status, 404);
+  assert.deepEqual(await readdir(join(f.dataDir, 'photos')), []);
+  await f.request('/api/account', { method: 'DELETE', cookie: moderator, body: { password } });
+  const replacement = await f.register('moderator');
+  assert.equal((await f.request('/api/moderation/reports', { cookie: replacement })).status, 403);
+});
 
 test('accounts, session boundaries, persistent photos, likes, comments and deletion', async t => {
   const f=await fixture(t), alice=await f.register('alice'), bob=await f.register('bob');

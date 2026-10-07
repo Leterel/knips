@@ -37,7 +37,8 @@ function reply(res, status, value) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(value));
 }
 
-export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigin = '', secureCookies = publicOrigin.startsWith('https:'), now = () => Date.now() } = {}) {
+export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigin = '', secureCookies = publicOrigin.startsWith('https:'), moderatorUsernames = [], now = () => Date.now() } = {}) {
+  if (!Array.isArray(moderatorUsernames) || moderatorUsernames.some(name => !/^[a-z0-9_]{3,24}$/.test(name))) throw Error('Ungültige Moderatorenliste.');
   if (publicOrigin) { const origin = new URL(publicOrigin); if (!['http:', 'https:'].includes(origin.protocol) || origin.origin !== publicOrigin) throw Error('PUBLIC_ORIGIN muss genau eine HTTP(S)-Origin ohne Pfad sein.'); }
   const photosDir = join(dataDir, 'photos');
   await mkdir(photosDir, { recursive: true, mode: 0o700 });
@@ -55,6 +56,10 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
     CREATE INDEX IF NOT EXISTS likes_post ON likes(post_id);
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);`);
   const dummySalt = randomBytes(16).toString('hex'), dummyPassword = await passwordHash(randomBytes(32).toString('hex'), dummySalt);
+  // Resolve already existing accounts once. A later signup cannot claim an operator role.
+  const moderators = new Set(moderatorUsernames.map(name => db.prepare('SELECT id FROM users WHERE username=?').get(name)?.id).filter(id => id !== undefined));
+  if (moderators.size !== new Set(moderatorUsernames).size) { db.close(); throw Error('Moderator-Konten zuerst anlegen, dann Server mit KNIPS_MODERATORS neu starten.'); }
+  const sessionUser = user => ({ ...userView(user), moderator: moderators.has(user.id) });
   const rates = new Map();
   function rate(req, group, max, windowMs = 15 * 60 * 1000) {
     const key = `${group}:${req.socket.remoteAddress}`, stamp = now();
@@ -119,7 +124,7 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         let id;
         try { id = Number(db.prepare('INSERT INTO users(username,display_name,salt,password_hash,created_at) VALUES (?,?,?,?,?)').run(username, displayName, salt, derived.toString('hex'), now()).lastInsertRowid); }
         catch (error) { if (error.code === 'ERR_SQLITE_ERROR' && error.errcode === 2067) fail(409, 'Dieser Nutzername ist schon vergeben.'); throw error; }
-        const user = db.prepare('SELECT * FROM users WHERE id=?').get(id); makeSession(res, user); return reply(res, 201, { user: userView(user) });
+        const user = db.prepare('SELECT * FROM users WHERE id=?').get(id); makeSession(res, user); return reply(res, 201, { user: sessionUser(user) });
       }
       if (path === '/api/login' && req.method === 'POST') {
         rate(req, 'login', 25); const data = await readJson(req);
@@ -127,12 +132,37 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         const user = db.prepare('SELECT * FROM users WHERE username=?').get(data.username.trim().toLowerCase());
         const actual = await passwordHash(data.password, user?.salt || dummySalt), expected = user ? Buffer.from(user.password_hash, 'hex') : dummyPassword;
         if (!timingSafeEqual(actual, expected) || !user) fail(401, 'Nutzername oder Passwort stimmt nicht.');
-        makeSession(res, user); return reply(res, 200, { user: userView(user) });
+        makeSession(res, user); return reply(res, 200, { user: sessionUser(user) });
       }
       const session = getSession(req);
-      if (path === '/api/me' && req.method === 'GET') return reply(res, 200, { user: session ? userView(session.user) : null });
+      if (path === '/api/me' && req.method === 'GET') return reply(res, 200, { user: session ? sessionUser(session.user) : null });
       if (!session) fail(401, 'Bitte melde dich zuerst an.');
       const user = session.user;
+      if (path.startsWith('/api/moderation/')) {
+        if (!moderators.has(user.id)) fail(403, 'Nur Moderatoren dürfen Meldungen bearbeiten.');
+        if (path === '/api/moderation/reports' && req.method === 'GET') {
+          const reports = db.prepare('SELECT r.id,r.reason,r.created_at AS createdAt,r.post_id AS postId,p.caption,u.username AS author,reporter.username AS reporter FROM reports r JOIN posts p ON p.id=r.post_id JOIN users u ON u.id=p.user_id JOIN users reporter ON reporter.id=r.user_id ORDER BY r.created_at,r.id LIMIT 50').all().map(report => ({ ...report, image: `/api/moderation/reports/${report.id}/image` }));
+          return reply(res, 200, { reports });
+        }
+        const imageMatch = path.match(/^\/api\/moderation\/reports\/([1-9]\d{0,14})\/image$/);
+        if (imageMatch && ['GET', 'HEAD'].includes(req.method)) {
+          const post = db.prepare('SELECT p.filename,p.mime FROM reports r JOIN posts p ON p.id=r.post_id WHERE r.id=?').get(Number(imageMatch[1]));
+          if (!post) fail(404, 'Meldung wurde bereits bearbeitet.');
+          const bytes = await readFile(join(photosDir, post.filename));
+          res.writeHead(200, { 'Content-Type': post.mime, 'Content-Length': bytes.length }); return res.end(req.method === 'HEAD' ? undefined : bytes);
+        }
+        const match = path.match(/^\/api\/moderation\/reports\/([1-9]\d{0,14})$/);
+        if (match && req.method === 'POST') {
+          const data = await readJson(req);
+          if (!['dismiss', 'remove-post'].includes(data.action)) fail(400, 'Ungültige Moderationsaktion.');
+          const report = db.prepare('SELECT r.post_id,p.filename FROM reports r JOIN posts p ON p.id=r.post_id WHERE r.id=?').get(Number(match[1]));
+          if (!report) fail(404, 'Meldung wurde bereits bearbeitet.');
+          if (data.action === 'dismiss') db.prepare('DELETE FROM reports WHERE id=?').run(Number(match[1]));
+          else { db.prepare('DELETE FROM posts WHERE id=?').run(report.post_id); await unlink(join(photosDir, report.filename)).catch(error => { if (error.code !== 'ENOENT') console.error('Fotodatei konnte nicht entfernt werden:', error.code); }); }
+          return reply(res, 200, { ok: true });
+        }
+        fail(404, 'Moderationsfunktion nicht gefunden.');
+      }
       if (path === '/api/logout' && req.method === 'POST') {
         db.prepare('DELETE FROM sessions WHERE token_hash=?').run(session.tokenHash); setCookie(res, '', 0); return reply(res, 200, { ok: true });
       }
@@ -149,6 +179,7 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
           db.prepare('DELETE FROM posts WHERE user_id=?').run(user.id);
           db.prepare('DELETE FROM users WHERE id=?').run(user.id);
           db.exec('COMMIT');
+          moderators.delete(user.id);
         } catch (error) { db.exec('ROLLBACK'); throw error; }
         await Promise.all(files.map(file => unlink(join(photosDir, file.filename)).catch(error => { if (error.code !== 'ENOENT') console.error('Fotodatei konnte nicht entfernt werden:', error.code); })));
         setCookie(res, '', 0); return reply(res, 200, { ok: true });
@@ -236,7 +267,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const host = process.env.HOST || '127.0.0.1', port = Number(process.env.PORT || 8790), publicOrigin = process.env.PUBLIC_ORIGIN || '';
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('PORT muss zwischen 1 und 65535 liegen.');
   if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !publicOrigin) throw Error('Bei Netzwerkzugriff ist PUBLIC_ORIGIN erforderlich. Für öffentliche Server HTTPS verwenden.');
-  const app = await createKnips({ dataDir: process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : undefined, publicOrigin });
+  const app = await createKnips({ dataDir: process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : undefined, publicOrigin, moderatorUsernames: (process.env.KNIPS_MODERATORS || '').split(',').map(name => name.trim()).filter(Boolean) });
   app.server.listen(port, host, () => console.log(`Knips läuft: ${publicOrigin || `http://${host}:${port}`} (Strg+C beendet den Server)`));
   const shutdown = () => app.close().then(() => process.exit(0));
   process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);

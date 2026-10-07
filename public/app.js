@@ -41,6 +41,7 @@ async function route() {
       if (view.username === me.username) {
         const actions = document.createElement('div'); actions.className = 'account-actions';
         actions.append(actionButton('Abmelden ↗', logout), actionButton('Blockierte Konten', showBlocks), actionButton('Konto löschen', deleteAccount)); $('#profile').append(actions);
+        if (me.moderator) actions.append(actionButton('Meldungen prüfen', showModeration));
       }
     }
     await loadFeed(false, version);
@@ -93,6 +94,32 @@ async function showBlocks() {
   for (const user of users) list.append(actionButton(`@${user.username} freigeben`, async () => {
     await api(`/api/blocks/${user.username}`, { method: 'DELETE', body: {} }); await showBlocks();
   })); $('#profile').append(list);
+}
+async function showModeration() {
+  const version = routeVersion;
+  const { reports } = await api('/api/moderation/reports');
+  if (version !== routeVersion || !me?.moderator) return;
+  document.querySelector('.moderation')?.remove();
+  const section = document.createElement('section'); section.className = 'moderation';
+  const title = document.createElement('h3'); title.textContent = 'Offene Meldungen'; section.append(title);
+  const help = document.createElement('p'); help.textContent = reports.length ? 'Bis zu 50 Meldungen, älteste zuerst. Nach Bearbeitung werden weitere geladen.' : 'Keine offenen Meldungen.'; section.append(help);
+  for (const report of reports) {
+    const card = document.createElement('article'); card.className = 'moderation-report';
+    const author = document.createElement('strong'); author.textContent = `Beitrag von @${report.author}`;
+    const caption = document.createElement('p'); caption.textContent = report.caption || '(Ohne Bildtext)';
+    const reason = document.createElement('p'); reason.textContent = `Meldung von @${report.reporter}: ${report.reason}`;
+    const image = document.createElement('img'); image.src = report.image; image.alt = 'Gemeldetes Foto zur Prüfung'; image.loading = 'lazy'; image.className = 'moderation-image';
+    card.append(author, image, caption, reason);
+    for (const [label, action] of [['Meldung schließen', 'dismiss'], ['Beitrag endgültig entfernen', 'remove-post']]) {
+      card.append(actionButton(label, async () => {
+        if (action === 'remove-post' && !confirm('Diesen Beitrag samt Foto, Likes und Kommentaren endgültig entfernen?')) return;
+        await api(`/api/moderation/reports/${report.id}`, { method: 'POST', body: { action } });
+        await showModeration(); notice('Meldung bearbeitet.');
+      }));
+    }
+    section.append(card);
+  }
+  $('#profile').append(section);
 }
 async function deleteAccount() {
   if (!confirm('Dein Konto und alle deine Fotos, Kommentare und Likes endgültig löschen? Das lässt sich nicht rückgängig machen.')) return;

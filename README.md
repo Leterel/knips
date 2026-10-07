@@ -37,13 +37,24 @@ Browserprüfung: Playwright installieren bzw. `PLAYWRIGHT_MODULE` auf dessen `in
 setzen; dann `node test/browser-smoke.mjs`. Benötigt installiertes Google Chrome.
 Sie verwendet ausschließlich synthetische Testdaten, einen temporären Server und Datenordner.
 
+## Moderation
+
+Zuerst ein eigenes Moderatorkonto normal anlegen. Anschließend den Server stoppen,
+`KNIPS_MODERATORS=dein_nutzername` setzen und neu starten (mehrere Namen mit Komma).
+Nicht vorhandene Konten werden abgelehnt; niemand erhält die Rolle über ein Formular.
+Unter **Mein Profil → Meldungen prüfen** lassen sich gemeldete Bilder ansehen,
+Meldungen schließen oder Beiträge samt Foto, Likes und Kommentaren entfernen.
+Jeweils bis zu 50 Meldungen werden geladen. Beim Löschen eines Moderatorkontos
+dessen Namen auch aus der Serverkonfiguration entfernen, bevor der Server neu startet.
+Browserprüfung: `node test/moderation-browser.mjs` mit derselben Playwright-Einrichtung.
+
 ## Grenzen
 
 - Alle angemeldeten Konten können Fotos sehen, soweit keine Blockierung besteht.
 - Registrierungen sind offen. Vor öffentlichem Betrieb fehlen Einladungen oder eine
   entsprechende Zugangskontrolle, moderierter Betrieb und belastbare Betriebsgrenzen.
-- Meldungen werden gespeichert; es gibt noch keine Moderationsoberfläche und keine
-  automatische Bearbeitung. Nicht als fertig moderiertes Netzwerk veröffentlichen.
+- Moderation erfolgt manuell durch konfigurierte Konten. Betreiber, Regeln und
+  verlässliche Bearbeitung müssen vor öffentlichem Betrieb festgelegt werden.
 - Kein Passwort-Reset, keine E-Mail-Verifikation, keine Push-Mitteilungen.
 - Der Client kodiert Fotos neu und entfernt dadurch Metadaten. Die Upload-API allein
   garantiert keine Metadatenentfernung für fremde Clients.
