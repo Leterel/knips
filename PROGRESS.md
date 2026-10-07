@@ -41,5 +41,9 @@ Neuer mobiler Chrome-Test prüft Anmeldung, Bildansicht, sichere Textdarstellung
 bestätigte Entfernung und aktualisierte Warteschlange. Der bisherige Browserablauf
 mit Upload/Like/Kommentar/Kontolöschung besteht ebenfalls. Keine neuen Gerätetests.
 
+Browser-`prompt`/`confirm` wurden für Melden, Blockieren und Löschen durch eigene
+HTML-Dialoge ersetzt, damit Android WebView und Desktop dieselbe Bedienung verwenden.
+Die Moderations- und Browserabläufe bestehen nach dieser Änderung erneut.
+
 Zusätzlich wurde ein unsigniertes Android-AAB gebaut (11.875 Bytes). BundleConfig,
 Manifest, DEX und Ressourcen sind vorhanden. Kein Play-Upload oder Produktionsschlüssel.

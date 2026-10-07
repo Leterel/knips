@@ -69,14 +69,14 @@ function renderPost(post) {
   for (const comment of post.comments) { const row = document.createElement('p'); row.className = 'comment'; const who = document.createElement('a'); who.href = `#user/${comment.user.username}`; who.textContent = comment.user.username; row.append(who, document.createTextNode(comment.body)); comments.append(row); }
   like.addEventListener('click', async () => { like.disabled = true; try { const result = await api(`/api/posts/${post.id}/like`, { method: post.liked ? 'DELETE' : 'PUT', body: {} }); if (article.isConnected) article.replaceWith(renderPost(result.post)); } catch (error) { notice(error.message); like.disabled = false; } });
   const form = article.querySelector('.comment-form'); form.addEventListener('submit', async event => { event.preventDefault(); const button = form.querySelector('button'); button.disabled = true; try { const result = await api(`/api/posts/${post.id}/comments`, { method: 'POST', body: { body: form.elements.comment.value } }); if (article.isConnected) article.replaceWith(renderPost(result.post)); } catch (error) { notice(error.message); button.disabled = false; } });
-  const remove = article.querySelector('.delete-post'); remove.hidden = !post.mine; remove.addEventListener('click', async () => { if (!confirm('Diesen Moment und seine Kommentare endgültig löschen?')) return; remove.disabled = true; try { await api(`/api/posts/${post.id}`, { method: 'DELETE', body: {} }); await route(); notice('Der Moment wurde gelöscht.'); } catch (error) { notice(error.message); remove.disabled = false; } });
+  const remove = article.querySelector('.delete-post'); remove.hidden = !post.mine; remove.addEventListener('click', async () => { if (!await askConfirm('Diesen Moment und seine Kommentare endgültig löschen?')) return; remove.disabled = true; try { await api(`/api/posts/${post.id}`, { method: 'DELETE', body: {} }); await route(); notice('Der Moment wurde gelöscht.'); } catch (error) { notice(error.message); remove.disabled = false; } });
   if (!post.mine) {
     const actions = document.createElement('div'); actions.className = 'safety-actions';
     actions.append(actionButton('Beitrag melden', async () => {
-      const reason = prompt('Warum möchtest du diesen Beitrag melden?'); if (!reason?.trim()) return;
+      const reason = await askText('Warum möchtest du diesen Beitrag melden?', 'Meldegrund'); if (!reason) return;
       await api(`/api/posts/${post.id}/report`, { method: 'POST', body: { reason: reason.trim() } }); notice('Deine Meldung wurde beim Server gespeichert.');
     }), actionButton('Konto blockieren', async () => {
-      if (!confirm(`@${post.user.username} blockieren? Eure Beiträge werden gegenseitig ausgeblendet.`)) return;
+      if (!await askConfirm(`@${post.user.username} blockieren? Eure Beiträge werden gegenseitig ausgeblendet.`)) return;
       await api(`/api/blocks/${post.user.username}`, { method: 'PUT', body: {} }); await route(); notice('Konto blockiert.');
     })); article.querySelector('.post-body').append(actions);
   }
@@ -112,7 +112,7 @@ async function showModeration() {
     card.append(author, image, caption, reason);
     for (const [label, action] of [['Meldung schließen', 'dismiss'], ['Beitrag endgültig entfernen', 'remove-post']]) {
       card.append(actionButton(label, async () => {
-        if (action === 'remove-post' && !confirm('Diesen Beitrag samt Foto, Likes und Kommentaren endgültig entfernen?')) return;
+        if (action === 'remove-post' && !await askConfirm('Diesen Beitrag samt Foto, Likes und Kommentaren endgültig entfernen?')) return;
         await api(`/api/moderation/reports/${report.id}`, { method: 'POST', body: { action } });
         await showModeration(); notice('Meldung bearbeitet.');
       }));
@@ -122,10 +122,31 @@ async function showModeration() {
   $('#profile').append(section);
 }
 async function deleteAccount() {
-  if (!confirm('Dein Konto und alle deine Fotos, Kommentare und Likes endgültig löschen? Das lässt sich nicht rückgängig machen.')) return;
+  if (!await askConfirm('Dein Konto und alle deine Fotos, Kommentare und Likes endgültig löschen? Das lässt sich nicht rückgängig machen.')) return;
   const password = await askPassword(); if (!password) return;
   await api('/api/account', { method: 'DELETE', body: { password } });
   me = null; showSession(); location.hash = 'feed'; notice('Dein Konto und deine Inhalte wurden gelöscht.');
+}
+function askConfirm(message) {
+  return new Promise(resolve => {
+    const dialog = document.createElement('dialog'), form = document.createElement('form');
+    const text = document.createElement('p'); text.textContent = message; form.append(text);
+    const accept = document.createElement('button'); accept.type = 'submit'; accept.className = 'primary'; accept.textContent = 'Bestätigen';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'subtle'; cancel.textContent = 'Abbrechen';
+    let answer = false; cancel.onclick = () => dialog.close(); form.append(accept, cancel);
+    form.onsubmit = event => { event.preventDefault(); answer = true; dialog.close(); };
+    dialog.append(form); document.body.append(dialog); dialog.addEventListener('close', () => { dialog.remove(); resolve(answer); }, { once: true }); dialog.showModal(); accept.focus();
+  });
+}
+function askText(title, placeholder) {
+  return new Promise(resolve => {
+    const dialog = document.createElement('dialog'), form = document.createElement('form'), label = document.createElement('label'), input = document.createElement('textarea');
+    label.textContent = title; input.placeholder = placeholder; input.maxLength = 1000; input.required = true; input.rows = 4; label.append(input); form.append(label);
+    const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'primary'; submit.textContent = 'Senden';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'subtle'; cancel.textContent = 'Abbrechen'; cancel.onclick = () => dialog.close(); form.append(submit, cancel);
+    let value = null; form.onsubmit = event => { event.preventDefault(); value = input.value.trim(); if (value) dialog.close(); };
+    dialog.append(form); document.body.append(dialog); dialog.addEventListener('close', () => { dialog.remove(); resolve(value); }, { once: true }); dialog.showModal(); input.focus();
+  });
 }
 function askPassword() {
   return new Promise(resolve => {

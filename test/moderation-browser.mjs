@@ -31,7 +31,8 @@ try {
   assert.equal(await page.locator('.moderation-report script').count(), 0);
   await page.locator('.moderation-image').evaluate(image => image.decode());
   await page.screenshot({ path: join(output, 'moderation.png'), fullPage: true });
-  page.once('dialog', dialog => dialog.accept()); await page.getByRole('button', { name: 'Beitrag endgültig entfernen' }).click();
+  await page.getByRole('button', { name: 'Beitrag endgültig entfernen' }).click();
+  await page.locator('dialog').getByRole('button', { name: 'Bestätigen', exact: true }).click();
   await page.getByText('Keine offenen Meldungen.', { exact: true }).waitFor();
   assert.equal((await fetch(origin + post.body.post.image, { headers: { Cookie: author.cookie } })).status, 404);
   assert.deepEqual(errors, []);

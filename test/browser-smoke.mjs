@@ -36,8 +36,8 @@ try {
   await page.screenshot({ path: join(output, 'mobile-feed.png'), fullPage: true });
   await page.setViewportSize({ width: 1280, height: 900 }); await page.screenshot({ path: join(output, 'desktop-feed.png'), fullPage: true });
   await page.locator('#nav-me').click(); await page.getByRole('button', { name: 'Konto löschen', exact: true }).waitFor();
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Konto löschen', exact: true }).click();
+  await page.locator('dialog').getByRole('button', { name: 'Bestätigen', exact: true }).click();
   await page.locator('dialog input').fill('test-only-password-123');
   await page.getByRole('button', { name: 'Endgültig löschen', exact: true }).click();
   await page.locator('#auth').waitFor({ state: 'visible' });
