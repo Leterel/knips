@@ -1,6 +1,12 @@
 const $ = selector => document.querySelector(selector);
 let me = null, mode = 'register', next = null, profileUser = null, selectedPhoto = null, previewUrl = null, routeVersion = 0;
 let messageTimer;
+let registration = 'open';
+const inviteLabel = document.createElement('label'), inviteInput = document.createElement('input');
+inviteLabel.textContent = 'Einladungscode'; inviteLabel.id = 'invitation-label'; inviteLabel.hidden = true;
+inviteInput.name = 'invitationCode'; inviteInput.type = 'password'; inviteInput.autocomplete = 'off'; inviteInput.maxLength = 256; inviteInput.disabled = true;
+inviteLabel.append(inviteInput); $('#auth-help').before(inviteLabel);
+const registrationHelp = document.createElement('p'); registrationHelp.id = 'registration-help'; registrationHelp.className = 'quiet'; registrationHelp.hidden = true; $('#auth-form').before(registrationHelp);
 function notice(text, persistent = false) { clearTimeout(messageTimer); $('#message').textContent = text; $('#message').hidden = !text; if (!persistent) messageTimer = setTimeout(() => { $('#message').hidden = true; }, 6500); }
 async function api(path, { method = 'GET', body } = {}) {
   const response = await fetch(path, { method, credentials: 'same-origin', headers: method === 'GET' ? {} : { 'Content-Type': 'application/json', 'X-Knips-Request': '1' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -10,7 +16,16 @@ async function api(path, { method = 'GET', body } = {}) {
 }
 function initials(name) { return name.trim().slice(0, 2).toUpperCase(); }
 function clearPhoto() { selectedPhoto = null; if (previewUrl) URL.revokeObjectURL(previewUrl); previewUrl = null; $('#photo').value = ''; $('#preview').removeAttribute('src'); $('#preview-wrap').hidden = true; $('#file-label').hidden = false; }
-function setMode(value) { mode = value; $('#register-tab').classList.toggle('active', mode === 'register'); $('#login-tab').classList.toggle('active', mode === 'login'); $('#display-label').hidden = mode === 'login'; $('#display-label input').required = mode === 'register'; $('#password').autocomplete = mode === 'register' ? 'new-password' : 'current-password'; $('#password').minLength = mode === 'register' ? 10 : 1; $('#auth-title').textContent = mode === 'register' ? 'Dein Platz ist noch frei.' : 'Schön, dich wiederzusehen.'; $('#auth-help').hidden = mode === 'login'; }
+function setMode(value) {
+  mode = registration === 'closed' ? 'login' : value;
+  $('#register-tab').disabled = registration === 'closed';
+  $('#register-tab').classList.toggle('active', mode === 'register'); $('#login-tab').classList.toggle('active', mode === 'login');
+  $('#display-label').hidden = mode === 'login'; $('#display-label input').required = mode === 'register';
+  $('#password').autocomplete = mode === 'register' ? 'new-password' : 'current-password'; $('#password').minLength = mode === 'register' ? 10 : 1;
+  $('#auth-title').textContent = mode === 'register' ? 'Dein Platz ist noch frei.' : 'Schön, dich wiederzusehen.'; $('#auth-help').hidden = mode === 'login';
+  inviteLabel.hidden = !(registration === 'invite' && mode === 'register'); inviteInput.disabled = inviteLabel.hidden; inviteInput.required = !inviteLabel.hidden;
+  registrationHelp.hidden = registration === 'open'; registrationHelp.textContent = registration === 'closed' ? 'Neue Konten sind hier derzeit geschlossen. Bestehende Konten können sich anmelden.' : 'Neue Konten brauchen einen Einladungscode vom Betreiber.';
+}
 $('#register-tab').addEventListener('click', () => setMode('register'));
 $('#login-tab').addEventListener('click', () => setMode('login'));
 $('#auth-form').addEventListener('submit', async event => {
@@ -166,4 +181,4 @@ async function preparePhoto(file) {
   const bitmap = await createImageBitmap(file); try { if (bitmap.width * bitmap.height > 40_000_000 || bitmap.width > 8192 || bitmap.height > 8192) throw Error('Das Foto ist zu groß. Bitte verkleinere es auf höchstens 40 Megapixel und 8192 Pixel pro Seite.'); const scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height)); const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); return canvas.toDataURL('image/jpeg', .9).split(',')[1]; } finally { bitmap.close(); }
 }
 $('#post-form').addEventListener('submit', async event => { event.preventDefault(); if (!selectedPhoto) return notice('Bitte zuerst ein Foto auswählen.'); const button = $('#post-submit'); button.disabled = true; button.textContent = 'Wird geteilt …'; try { const image = await preparePhoto(selectedPhoto); await api('/api/posts', { method: 'POST', body: { image, caption: $('#caption').value } }); $('#post-form').reset(); clearPhoto(); location.hash = 'feed'; notice('Dein Moment ist jetzt im Feed.'); } catch (error) { notice(error.message || 'Dieses Foto konnte nicht gelesen werden.'); } finally { button.disabled = false; button.textContent = 'Moment teilen ↗'; } });
-try { me = (await api('/api/me')).user; showSession(); } catch { showSession(); notice('Keine Verbindung zu Knips. Läuft der Server?', true); }
+try { const [config, session] = await Promise.all([api('/api/config'), api('/api/me')]); registration = config.registration; setMode(mode); me = session.user; showSession(); } catch { showSession(); notice('Keine Verbindung zu Knips. Läuft der Server?', true); }

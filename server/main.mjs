@@ -37,7 +37,9 @@ function reply(res, status, value) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(value));
 }
 
-export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigin = '', secureCookies = publicOrigin.startsWith('https:'), moderatorUsernames = [], now = () => Date.now() } = {}) {
+export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigin = '', secureCookies = publicOrigin.startsWith('https:'), moderatorUsernames = [], registration = 'open', invitationCode = '', now = () => Date.now() } = {}) {
+  if (!['open', 'invite', 'closed'].includes(registration)) throw Error('KNIPS_REGISTRATION muss open, invite oder closed sein.');
+  if (registration === 'invite' && (typeof invitationCode !== 'string' || invitationCode.length < 16 || invitationCode.length > 256)) throw Error('Für Einladungen wird ein Code mit 16 bis 256 Zeichen benötigt.');
   if (!Array.isArray(moderatorUsernames) || moderatorUsernames.some(name => !/^[a-z0-9_]{3,24}$/.test(name))) throw Error('Ungültige Moderatorenliste.');
   if (publicOrigin) { const origin = new URL(publicOrigin); if (!['http:', 'https:'].includes(origin.protocol) || origin.origin !== publicOrigin) throw Error('PUBLIC_ORIGIN muss genau eine HTTP(S)-Origin ohne Pfad sein.'); }
   const photosDir = join(dataDir, 'photos');
@@ -51,14 +53,27 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
     CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE, body TEXT NOT NULL, created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS blocks (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(user_id,blocked_id), CHECK(user_id != blocked_id));
     CREATE TABLE IF NOT EXISTS reports (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE, reason TEXT NOT NULL, created_at INTEGER NOT NULL, UNIQUE(user_id,post_id));
+    CREATE TABLE IF NOT EXISTS moderator_bindings (username TEXT PRIMARY KEY, identity_hash TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS posts_user ON posts(user_id, id DESC);
     CREATE INDEX IF NOT EXISTS comments_post ON comments(post_id, id);
     CREATE INDEX IF NOT EXISTS likes_post ON likes(post_id);
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);`);
+  // Retain a one-way identity pin after account deletion. Reusing a configured
+  // name must never grant its old role, including after the server restarts.
+  const moderators = new Set();
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    for (const username of new Set(moderatorUsernames)) {
+      const account = db.prepare('SELECT id,salt FROM users WHERE username=?').get(username);
+      if (!account) throw Error('Moderator-Konten zuerst anlegen, dann Server mit KNIPS_MODERATORS neu starten.');
+      const identity = hash(account.salt), pinned = db.prepare('SELECT identity_hash FROM moderator_bindings WHERE username=?').get(username);
+      if (pinned && pinned.identity_hash !== identity) throw Error('Moderator-Identität wurde ersetzt. Verwende ein neues Moderatorkonto mit anderem Namen.');
+      db.prepare('INSERT OR IGNORE INTO moderator_bindings VALUES (?,?)').run(username, identity);
+      moderators.add(account.id);
+    }
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); db.close(); throw error; }
   const dummySalt = randomBytes(16).toString('hex'), dummyPassword = await passwordHash(randomBytes(32).toString('hex'), dummySalt);
-  // Resolve already existing accounts once. A later signup cannot claim an operator role.
-  const moderators = new Set(moderatorUsernames.map(name => db.prepare('SELECT id FROM users WHERE username=?').get(name)?.id).filter(id => id !== undefined));
-  if (moderators.size !== new Set(moderatorUsernames).size) { db.close(); throw Error('Moderator-Konten zuerst anlegen, dann Server mit KNIPS_MODERATORS neu starten.'); }
   const sessionUser = user => ({ ...userView(user), moderator: moderators.has(user.id) });
   const rates = new Map();
   function rate(req, group, max, windowMs = 15 * 60 * 1000) {
@@ -114,8 +129,11 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         res.writeHead(200, { 'Content-Type': mime, 'Content-Length': body.length }); return res.end(req.method === 'HEAD' ? undefined : body);
       }
       if (path === '/health' && req.method === 'GET') return reply(res, 200, { ok: true });
+      if (path === '/api/config' && req.method === 'GET') return reply(res, 200, { registration });
       if (path === '/api/register' && req.method === 'POST') {
         rate(req, 'register', 8); const data = await readJson(req);
+        if (registration === 'closed') fail(403, 'Neue Konten sind auf diesem Server derzeit geschlossen.');
+        if (registration === 'invite' && (typeof data.invitationCode !== 'string' || !timingSafeEqual(Buffer.from(hash(data.invitationCode)), Buffer.from(hash(invitationCode))))) fail(403, 'Ein gültiger Einladungscode ist erforderlich.');
         const username = cleanText(data.username, 24, 'Nutzername').toLowerCase();
         if (!/^[a-z0-9_]{3,24}$/.test(username)) fail(400, 'Nutzername: 3–24 kleine Buchstaben, Zahlen oder Unterstriche.');
         const displayName = cleanText(data.displayName, 60, 'Anzeigename');
@@ -132,12 +150,19 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         const user = db.prepare('SELECT * FROM users WHERE username=?').get(data.username.trim().toLowerCase());
         const actual = await passwordHash(data.password, user?.salt || dummySalt), expected = user ? Buffer.from(user.password_hash, 'hex') : dummyPassword;
         if (!timingSafeEqual(actual, expected) || !user) fail(401, 'Nutzername oder Passwort stimmt nicht.');
+        if (db.prepare('SELECT salt FROM users WHERE id=?').get(user.id)?.salt !== user.salt) fail(401, 'Dieses Konto existiert nicht mehr.');
         makeSession(res, user); return reply(res, 200, { user: sessionUser(user) });
       }
       const session = getSession(req);
       if (path === '/api/me' && req.method === 'GET') return reply(res, 200, { user: session ? sessionUser(session.user) : null });
       if (!session) fail(401, 'Bitte melde dich zuerst an.');
       const user = session.user;
+      // Reading bodies/files and deriving passwords yields to other requests.
+      // Recheck before committing so logout/deletion cannot leave a stale writer.
+      function assertSession() {
+        const current = getSession(req);
+        if (!current || current.user.id !== user.id || current.user.salt !== user.salt) fail(401, 'Deine Sitzung ist abgelaufen. Bitte erneut anmelden.');
+      }
       if (path.startsWith('/api/moderation/')) {
         if (!moderators.has(user.id)) fail(403, 'Nur Moderatoren dürfen Meldungen bearbeiten.');
         if (path === '/api/moderation/reports' && req.method === 'GET') {
@@ -149,11 +174,13 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
           const post = db.prepare('SELECT p.filename,p.mime FROM reports r JOIN posts p ON p.id=r.post_id WHERE r.id=?').get(Number(imageMatch[1]));
           if (!post) fail(404, 'Meldung wurde bereits bearbeitet.');
           const bytes = await readFile(join(photosDir, post.filename));
+          assertSession();
           res.writeHead(200, { 'Content-Type': post.mime, 'Content-Length': bytes.length }); return res.end(req.method === 'HEAD' ? undefined : bytes);
         }
         const match = path.match(/^\/api\/moderation\/reports\/([1-9]\d{0,14})$/);
         if (match && req.method === 'POST') {
           const data = await readJson(req);
+          assertSession();
           if (!['dismiss', 'remove-post'].includes(data.action)) fail(400, 'Ungültige Moderationsaktion.');
           const report = db.prepare('SELECT r.post_id,p.filename FROM reports r JOIN posts p ON p.id=r.post_id WHERE r.id=?').get(Number(match[1]));
           if (!report) fail(404, 'Meldung wurde bereits bearbeitet.');
@@ -171,6 +198,7 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         if (typeof data.password !== 'string' || data.password.length > 128) fail(400, 'Bitte Passwort bestätigen.');
         const actual = await passwordHash(data.password, user.salt);
         if (!timingSafeEqual(actual, Buffer.from(user.password_hash, 'hex'))) fail(403, 'Das Passwort stimmt nicht.');
+        assertSession();
         const files = db.prepare('SELECT filename FROM posts WHERE user_id=?').all(user.id);
         db.exec('BEGIN IMMEDIATE');
         try {
@@ -200,6 +228,8 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         const name = path.slice(7); if (!/^[a-f0-9]{48}\.(jpg|png|webp)$/.test(name)) fail(404, 'Foto nicht gefunden.');
         const post = db.prepare('SELECT mime,user_id FROM posts WHERE filename=?').get(name); if (!post || blocked(user.id,post.user_id)) fail(404, 'Foto nicht gefunden.');
         const bytes = await readFile(join(photosDir, name));
+        assertSession();
+        if (blocked(user.id, post.user_id)) fail(404, 'Foto nicht gefunden.');
         res.writeHead(200, { 'Content-Type': post.mime, 'Content-Length': bytes.length }); return res.end(req.method === 'HEAD' ? undefined : bytes);
       }
       if (path === '/api/feed' && req.method === 'GET') {
@@ -217,12 +247,13 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
       }
       if (path === '/api/posts' && req.method === 'POST') {
         rate(req, 'upload', 40); const data = await readJson(req, JSON_LIMIT); const caption = cleanText(data.caption ?? '', 2200, 'Bildtext', true);
+        assertSession();
         if (typeof data.image !== 'string' || !data.image.length || data.image.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 || data.image.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data.image)) fail(400, 'Ungültige oder zu große Bilddatei.');
         const bytes = Buffer.from(data.image, 'base64'); if (bytes.toString('base64') !== data.image) fail(400, 'Ungültige Bilddatei.');
         const image = inspectImage(bytes), filename = `${randomBytes(24).toString('hex')}.${image.ext}`;
         await writeFile(join(photosDir, filename), bytes, { flag: 'wx', mode: 0o600 });
         let id;
-        try { id = Number(db.prepare('INSERT INTO posts(user_id,filename,mime,width,height,caption,created_at) VALUES (?,?,?,?,?,?,?)').run(user.id, filename, image.type, image.width, image.height, caption, now()).lastInsertRowid); }
+        try { assertSession(); id = Number(db.prepare('INSERT INTO posts(user_id,filename,mime,width,height,caption,created_at) VALUES (?,?,?,?,?,?,?)').run(user.id, filename, image.type, image.width, image.height, caption, now()).lastInsertRowid); }
         catch (error) { await unlink(join(photosDir, filename)).catch(() => {}); throw error; }
         return reply(res, 201, { post: serializePost(db.prepare(`${postSelect} WHERE p.id=?`).get(id), user) });
       }
@@ -241,12 +272,16 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         }
         if (action === 'report' && req.method === 'POST') {
           rate(req, 'report', 30); const data = await readJson(req); const reason = cleanText(data.reason, 1000, 'Meldegrund');
+          assertSession();
+          if (!db.prepare('SELECT 1 FROM posts WHERE id=?').get(id) || blocked(user.id, post.user_id)) fail(404, 'Beitrag nicht gefunden.');
           if (post.user_id === user.id) fail(400, 'Eigene Beiträge kannst du löschen.');
           db.prepare('INSERT OR IGNORE INTO reports(user_id,post_id,reason,created_at) VALUES (?,?,?,?)').run(user.id,id,reason,now());
           return reply(res, 201, { ok: true });
         }
         if (action === 'comments' && req.method === 'POST') {
           rate(req, 'comment', 100); const data = await readJson(req); const body = cleanText(data.body, 500, 'Kommentar');
+          assertSession();
+          if (!db.prepare('SELECT 1 FROM posts WHERE id=?').get(id) || blocked(user.id, post.user_id)) fail(404, 'Beitrag nicht gefunden.');
           db.prepare('INSERT INTO comments(user_id,post_id,body,created_at) VALUES (?,?,?,?)').run(user.id, id, body, now());
           return reply(res, 201, { post: serializePost(post, user) });
         }
@@ -267,7 +302,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const host = process.env.HOST || '127.0.0.1', port = Number(process.env.PORT || 8790), publicOrigin = process.env.PUBLIC_ORIGIN || '';
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('PORT muss zwischen 1 und 65535 liegen.');
   if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !publicOrigin) throw Error('Bei Netzwerkzugriff ist PUBLIC_ORIGIN erforderlich. Für öffentliche Server HTTPS verwenden.');
-  const app = await createKnips({ dataDir: process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : undefined, publicOrigin, moderatorUsernames: (process.env.KNIPS_MODERATORS || '').split(',').map(name => name.trim()).filter(Boolean) });
+  const app = await createKnips({ dataDir: process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : undefined, publicOrigin, moderatorUsernames: (process.env.KNIPS_MODERATORS || '').split(',').map(name => name.trim()).filter(Boolean), registration: process.env.KNIPS_REGISTRATION || 'open', invitationCode: process.env.KNIPS_INVITATION_CODE || '' });
   app.server.listen(port, host, () => console.log(`Knips läuft: ${publicOrigin || `http://${host}:${port}`} (Strg+C beendet den Server)`));
   const shutdown = () => app.close().then(() => process.exit(0));
   process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);

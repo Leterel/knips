@@ -1,5 +1,14 @@
 # Fortschritt — 2026-10-01
 
+## 08.10.2026 — Zugang und Sitzungen
+
+Optionale Einladungscodes und geschlossene Registrierungen implementiert.
+Moderatorrollen bleiben an die ursprüngliche Kontoidentität gebunden, auch wenn
+ein Name nach Kontolöschung neu vergeben wird. Laufende Uploads und Kommentare
+prüfen vor dem Speichern erneut Sitzung und Blockierung.
+Acht HTTP/SQLite-Szenarien und mobiler Chrome-Test für Einladung/Anmeldung bestanden.
+Die Sandbox blockierte lokale Verbindungen; der genehmigte Lauf außerhalb bestand.
+
 ## Umgesetzt
 
 Persistente Konten/Sitzungen und SQLite-Datenbank; Foto-Upload, chronologischer Feed,

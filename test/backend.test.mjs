@@ -22,7 +22,18 @@ async function fixture(t) {
   }
   async function register(username) { const result = await request('/api/register',{method:'POST',body:{username,displayName:username,password}}); assert.equal(result.status,201); return result.cookie; }
   async function post(cookie,caption='A real test image') { const result=await request('/api/posts',{method:'POST',cookie,body:{image:png,caption}}); assert.equal(result.status,201); return result.body.post; }
-  return { request, register, post, dataDir, origin: () => origin, async restart(options){await app.close();await start(options);} };
+  async function streaming(path, cookie, body) {
+    const payload = JSON.stringify(body), split = Math.floor(payload.length / 2);
+    let req;
+    const started = new Promise(resolve => app.server.once('request', resolve));
+    const response = new Promise((resolve, reject) => {
+      req = httpRequest(origin + path, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json', 'X-Knips-Request': '1', 'Content-Length': Buffer.byteLength(payload) } }, res => { const chunks=[]; res.on('data', chunk => chunks.push(chunk)); res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(Buffer.concat(chunks)) })); });
+      req.on('error', reject); req.write(payload.slice(0, split));
+    });
+    await started; t.after(() => req.destroy());
+    return { finish: () => { req.end(payload.slice(split)); return response; } };
+  }
+  return { request, register, post, streaming, dataDir, origin: () => origin, async restart(options){await app.close();await start(options);} };
 }
 
 test('moderators can review reports and remove content; ordinary accounts cannot', async t => {
@@ -49,6 +60,9 @@ test('moderators can review reports and remove content; ordinary accounts cannot
   assert.deepEqual(await readdir(join(f.dataDir, 'photos')), []);
   await f.request('/api/account', { method: 'DELETE', cookie: moderator, body: { password } });
   const replacement = await f.register('moderator');
+  assert.equal((await f.request('/api/moderation/reports', { cookie: replacement })).status, 403);
+  await assert.rejects(f.restart({ moderatorUsernames: ['moderator'] }), /Identität/);
+  await f.restart();
   assert.equal((await f.request('/api/moderation/reports', { cookie: replacement })).status, 403);
 });
 
@@ -148,4 +162,41 @@ test('feed pagination has no duplicates or missing records',async t=>{
   const second=(await f.request(`/api/feed?before=${first.next}`,{cookie:alice})).body;
   assert.equal(second.posts.length,3);assert.equal(second.next,null);
   assert.equal(new Set([...first.posts,...second.posts].map(p=>p.id)).size,23);
+});
+
+test('invite-only and closed signup enforce server-side rules without leaking the code', async t => {
+  const f = await fixture(t), alice = await f.register('alice');
+  const invitationCode = 'test-only-invitation-code';
+  await f.restart({ registration: 'invite', invitationCode });
+  assert.deepEqual((await f.request('/api/config')).body, { registration: 'invite' });
+  const body = { username: 'invited', displayName: 'Invited', password };
+  for (const code of [undefined, 'wrong', ['test-only-invitation-code']]) {
+    const denied = await f.request('/api/register', { method: 'POST', body: { ...body, invitationCode: code } });
+    assert.equal(denied.status, 403); assert.ok(!JSON.stringify(denied.body).includes(invitationCode));
+  }
+  assert.equal((await f.request('/api/register', { method: 'POST', body: { ...body, invitationCode } })).status, 201);
+  await f.restart({ registration: 'closed' });
+  assert.deepEqual((await f.request('/api/config')).body, { registration: 'closed' });
+  assert.equal((await f.request('/api/register', { method: 'POST', body: { ...body, username: 'blocked', invitationCode } })).status, 403);
+  assert.equal((await f.request('/api/login', { method: 'POST', body: { username: 'alice', password } })).status, 200);
+  assert.equal((await f.request('/api/me', { cookie: alice })).body.user.username, 'alice');
+});
+
+test('in-flight writes cannot outlive logout, account deletion or a new block', async t => {
+  const f = await fixture(t), alice = await f.register('alice'); let bob = await f.register('bob');
+  const photo = await f.post(alice);
+  const comment = await f.streaming(`/api/posts/${photo.id}/comments`, bob, { body: 'should not survive logout' });
+  await f.request('/api/logout', { method: 'POST', cookie: bob });
+  assert.equal((await comment.finish()).status, 401);
+  bob = (await f.request('/api/login', { method: 'POST', body: { username: 'bob', password } })).cookie;
+  const blockedComment = await f.streaming(`/api/posts/${photo.id}/comments`, bob, { body: 'should not cross a block' });
+  await f.request('/api/blocks/bob', { method: 'PUT', cookie: alice });
+  assert.equal((await blockedComment.finish()).status, 404);
+  const upload = await f.streaming('/api/posts', bob, { image: png, caption: 'old identity' });
+  await f.request('/api/account', { method: 'DELETE', cookie: bob, body: { password } });
+  const replacement = await f.register('replacement');
+  assert.equal((await upload.finish()).status, 401);
+  const feed = (await f.request('/api/feed', { cookie: replacement })).body.posts;
+  assert.equal(feed.length, 1); assert.equal(feed[0].commentCount, 0);
+  assert.equal((await readdir(join(f.dataDir, 'photos'))).length, 1);
 });

@@ -39,6 +39,12 @@ Sie verwendet ausschließlich synthetische Testdaten, einen temporären Server u
 
 ## Moderation
 
+Neue Konten lassen sich mit `KNIPS_REGISTRATION=closed` sperren. Bestehende
+Konten können sich weiterhin anmelden. Mit `KNIPS_REGISTRATION=invite` und einem
+privaten `KNIPS_INVITATION_CODE` (16 bis 256 Zeichen) ist für neue Konten ein
+Einladungscode nötig. Ohne diese Einstellung bleibt der lokale Prototyp offen.
+Den Code nur privat weitergeben und niemals in Git einchecken.
+
 Zuerst ein eigenes Moderatorkonto normal anlegen. Anschließend den Server stoppen,
 `KNIPS_MODERATORS=dein_nutzername` setzen und neu starten (mehrere Namen mit Komma).
 Nicht vorhandene Konten werden abgelehnt; niemand erhält die Rolle über ein Formular.
@@ -46,6 +52,9 @@ Unter **Mein Profil → Meldungen prüfen** lassen sich gemeldete Bilder ansehen
 Meldungen schließen oder Beiträge samt Foto, Likes und Kommentaren entfernen.
 Jeweils bis zu 50 Meldungen werden geladen. Beim Löschen eines Moderatorkontos
 dessen Namen auch aus der Serverkonfiguration entfernen, bevor der Server neu startet.
+Die ursprüngliche Moderatoridentität wird gespeichert: Ein neu angelegtes Konto
+mit demselben Namen erhält auch nach Neustart keine alte Rolle. Für einen neuen
+Moderator ein Konto mit anderem Namen verwenden.
 Browserprüfung: `node test/moderation-browser.mjs` mit derselben Playwright-Einrichtung.
 
 ## Grenzen
