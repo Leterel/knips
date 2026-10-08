@@ -18,3 +18,13 @@ BundleConfig, Manifest, DEX und Ressourcen sind im Archiv vorhanden. Das AAB ist
 nicht für den Play-Upload signiert. AGP 8.7.3 meldet für compileSdk 36 eine
 Kompatibilitätswarnung. Noch offen: Produktionsschlüssel, Play-Signierung,
 öffentlicher HTTPS-Server, Consent/Werbung und Store-Checks.
+
+## Bundletool-Prüfung am 08.10.2026
+
+Offizielles bundletool-all 1.18.3 akzeptiert das Bundle. Daraus erzeugte, lokal
+testsignierte APKs im API-34-Emulator emulator-5570 installiert und gestartet;
+Serverauswahl sichtbar, kein fataler App-Fehler im geprüften Logausschnitt.
+Kein neuer Ende-zu-Ende-Uploadlauf mit diesem APK-Set; dessen Nachweis vom 01.10.
+gehört zur direkt gebauten APK. Produktionssignierung bleibt ungetestet.
+Belege: outputs/knips/aab-verification-20261008 im Workspace.
+Runner: android/tests/test-app-bundle.ps1 mit explizitem Emulator und QEMU-Prüfung.
