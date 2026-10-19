@@ -1,5 +1,18 @@
 # Fortschritt — 2026-10-01
 
+## 17.10.2026 — Datenbetrieb
+
+Offline-Backup und Wiederherstellung implementiert: Datenbank plus referenzierte
+Fotos, Prüfsummen, neue Zielordner, keine alten Sitzungen im Backup.
+Gemeinsame Datenordnersperre für Server und Wartung; Fehler beim Start räumen
+die eigene Sperre auf. Bestehende Daten und Backups werden nicht überschrieben.
+Zwölf Backend-/Sicherungsprüfungen bestanden; darunter echter Login und Fotoabruf
+aus einer wiederhergestellten Sicherung sowie abgelehnte unvollständige/manipulierte
+Backups. Nur temporäre synthetische Testdaten verwendet.
+
+Am 19.10.2026 erneut bestanden: alle zwölf Prüfungen sowie die Chrome-Abläufe
+für Upload, Sitzung, Interaktionen, Kontolöschung und Einladungsregistrierung.
+
 ## 08.10.2026 — Zugang und Sitzungen
 
 Optionale Einladungscodes und geschlossene Registrierungen implementiert.

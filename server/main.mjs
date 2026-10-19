@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { inspectImage, MAX_IMAGE_BYTES } from './images.mjs';
+import { acquireDataLock } from './data-lock.mjs';
 
 const derive = promisify(scrypt);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -44,7 +45,10 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
   if (publicOrigin) { const origin = new URL(publicOrigin); if (!['http:', 'https:'].includes(origin.protocol) || origin.origin !== publicOrigin) throw Error('PUBLIC_ORIGIN muss genau eine HTTP(S)-Origin ohne Pfad sein.'); }
   const photosDir = join(dataDir, 'photos');
   await mkdir(photosDir, { recursive: true, mode: 0o700 });
-  const db = new DatabaseSync(join(dataDir, 'knips.sqlite'));
+  const releaseLock = await acquireDataLock(dataDir);
+  let db;
+  try {
+  db = new DatabaseSync(join(dataDir, 'knips.sqlite'));
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE, display_name TEXT NOT NULL, salt TEXT NOT NULL, password_hash TEXT NOT NULL, created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL);
@@ -72,7 +76,7 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
       moderators.add(account.id);
     }
     db.exec('COMMIT');
-  } catch (error) { db.exec('ROLLBACK'); db.close(); throw error; }
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
   const dummySalt = randomBytes(16).toString('hex'), dummyPassword = await passwordHash(randomBytes(32).toString('hex'), dummySalt);
   const sessionUser = user => ({ ...userView(user), moderator: moderators.has(user.id) });
   const rates = new Map();
@@ -294,8 +298,17 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
     }
   });
   server.requestTimeout = 30_000; server.headersTimeout = 15_000; server.maxHeadersCount = 50;
-  let closed = false;
-  return { server, async close() { if (closed) return; closed = true; if (server.listening) await new Promise((resolveClose, reject) => { server.close(error => error ? reject(error) : resolveClose()); server.closeIdleConnections(); }); db.close(); } };
+  let closing;
+  return { server, close() {
+    if (!closing) closing = (async () => {
+      try {
+        if (server.listening) await new Promise((resolveClose, reject) => { server.close(error => error ? reject(error) : resolveClose()); server.closeIdleConnections(); });
+        db.close();
+      } finally { await releaseLock(); }
+    })();
+    return closing;
+  } };
+  } catch (error) { try { db?.close(); } finally { await releaseLock(); } throw error; }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -303,7 +316,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('PORT muss zwischen 1 und 65535 liegen.');
   if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !publicOrigin) throw Error('Bei Netzwerkzugriff ist PUBLIC_ORIGIN erforderlich. Für öffentliche Server HTTPS verwenden.');
   const app = await createKnips({ dataDir: process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : undefined, publicOrigin, moderatorUsernames: (process.env.KNIPS_MODERATORS || '').split(',').map(name => name.trim()).filter(Boolean), registration: process.env.KNIPS_REGISTRATION || 'open', invitationCode: process.env.KNIPS_INVITATION_CODE || '' });
-  app.server.listen(port, host, () => console.log(`Knips läuft: ${publicOrigin || `http://${host}:${port}`} (Strg+C beendet den Server)`));
+  try {
+    await new Promise((resolveListen, reject) => {
+      app.server.once('error', reject);
+      app.server.listen(port, host, resolveListen);
+    });
+  } catch (error) { await app.close(); throw error; }
+  console.log(`Knips läuft: ${publicOrigin || `http://${host}:${port}`} (Strg+C beendet den Server)`);
   const shutdown = () => app.close().then(() => process.exit(0));
   process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
 }

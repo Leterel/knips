@@ -13,7 +13,7 @@ npm start
 ```
 
 Im Browser http://127.0.0.1:8790 öffnen. Daten bleiben unter `data/` (SQLite und Fotos).
-Vor einem Backup Server stoppen und den gesamten Datenordner sichern.
+Sicherung und Wiederherstellung sind unten beschrieben. Vor der Sicherung Server stoppen.
 
 Für den Android-Emulator in PowerShell:
 
@@ -60,15 +60,40 @@ Browserprüfung: `node test/moderation-browser.mjs` mit derselben Playwright-Ein
 ## Grenzen
 
 - Alle angemeldeten Konten können Fotos sehen, soweit keine Blockierung besteht.
-- Registrierungen sind offen. Vor öffentlichem Betrieb fehlen Einladungen oder eine
-  entsprechende Zugangskontrolle, moderierter Betrieb und belastbare Betriebsgrenzen.
+- Registrierungen sind standardmäßig offen; Einladungscode oder geschlossene
+  Registrierung vor einem privaten Betrieb ausdrücklich konfigurieren.
 - Moderation erfolgt manuell durch konfigurierte Konten. Betreiber, Regeln und
   verlässliche Bearbeitung müssen vor öffentlichem Betrieb festgelegt werden.
 - Kein Passwort-Reset, keine E-Mail-Verifikation, keine Push-Mitteilungen.
 - Der Client kodiert Fotos neu und entfernt dadurch Metadaten. Die Upload-API allein
   garantiert keine Metadatenentfernung für fremde Clients.
-- Kein AdMob, kein Play-Store-AAB, keine Store-Freigabe. Betreiberangaben,
+- Kein AdMob und keine Store-Freigabe. Ein unsigniertes, validiertes AAB existiert.
+  Betreiberangaben,
   Datenschutzerklärung und öffentliche Löschmöglichkeit müssen vor Veröffentlichung ergänzt werden.
 - Entwicklungs-APK; Signaturschlüssel und Nutzerdaten bleiben außerhalb von Git.
 
 Aktuelle Prüfergebnisse: [PROGRESS.md](PROGRESS.md).
+
+## Datensicherung und Wiederherstellung
+
+Server beenden, dann mit Node 24 eine neue Sicherung erstellen:
+
+```sh
+node tools/backup.mjs ./data ./backup-2026-10-17
+node tools/restore.mjs ./backup-2026-10-17 ./restored-data
+```
+
+Die Elternordner der Ziele müssen existieren. Beide Werkzeuge verlangen neue
+Zielordner und überschreiben keine bestehenden Daten. Danach `DATA_DIR` auf
+den wiederhergestellten Ordner setzen und normal starten. Konten, Fotos und
+Moderatoridentitäten bleiben erhalten. Alle müssen sich nach der Wiederherstellung
+neu anmelden; aktive Sitzungen werden nicht gesichert. Das ursprüngliche Datenverzeichnis
+bleibt unverändert. Backups enthalten private Kontodaten und Fotos: privat aufbewahren.
+
+`backup.json` enthält Prüfsummen für Datenbank und referenzierte Fotos. Ein
+`INCOMPLETE`-Marker kennzeichnet eine fehlgeschlagene Sicherung. Unvollständige
+Wiederherstellungen bleiben gesperrt. Der Server und Wartungswerkzeuge teilen
+eine `.knips.lock`-Datei; Sicherungen während des Serverbetriebs werden abgelehnt.
+Nach einem Absturz erst sicherstellen, dass kein Knips-Prozess diesen Ordner
+verwendet, dann eine zurückgebliebene `.knips.lock` manuell entfernen. Die Sperre
+wird absichtlich nicht allein anhand einer möglicherweise wiederverwendeten PID entfernt.
