@@ -16,7 +16,14 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto(origin);
+  await page.goto(`${origin}/delete-account`);
+  await page.getByRole('heading', { name: 'Konto und Daten löschen', exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'deletion page mobile overflow');
+  await page.screenshot({ path: join(output, 'mobile-account-deletion.png'), fullPage: true });
+  await page.getByRole('link', { name: 'Zur Anmeldung und Kontolöschung' }).click();
+  await page.locator('#auth').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#password').getAttribute('autocomplete'), 'current-password');
+  await page.locator('#register-tab').click();
   await page.locator('[name=username]').fill('browser_alice');
   await page.locator('[name=displayName]').fill('Alice');
   await page.locator('#password').fill('test-only-password-123');
@@ -35,7 +42,9 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'mobile horizontal overflow');
   await page.screenshot({ path: join(output, 'mobile-feed.png'), fullPage: true });
   await page.setViewportSize({ width: 1280, height: 900 }); await page.screenshot({ path: join(output, 'desktop-feed.png'), fullPage: true });
-  await page.locator('#nav-me').click(); await page.getByRole('button', { name: 'Konto löschen', exact: true }).waitFor();
+  await page.goto(`${origin}/delete-account`);
+  await page.getByRole('link', { name: 'Zur Anmeldung und Kontolöschung' }).click();
+  await page.getByRole('button', { name: 'Konto löschen', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Konto löschen', exact: true }).click();
   await page.locator('dialog').getByRole('button', { name: 'Bestätigen', exact: true }).click();
   await page.locator('dialog input').fill('test-only-password-123');

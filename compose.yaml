@@ -1,0 +1,43 @@
+services:
+  knips:
+    build: .
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 45s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      PUBLIC_ORIGIN: https://${KNIPS_DOMAIN:?Run node tools/configure-deployment.mjs first}
+      KNIPS_REGISTRATION: ${KNIPS_REGISTRATION:-invite}
+      KNIPS_INVITATION_CODE: ${KNIPS_INVITATION_CODE:?Missing invitation code}
+      KNIPS_MODERATORS: ${KNIPS_MODERATORS:-}
+      KNIPS_TRUST_PROXY: "1"
+    volumes:
+      - knips_data:/data
+    networks: [backend]
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      KNIPS_DOMAIN: ${KNIPS_DOMAIN:?Missing domain}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [backend, edge]
+    depends_on:
+      knips:
+        condition: service_healthy
+networks:
+  backend:
+    internal: true
+  edge: {}
+volumes:
+  knips_data:
+  caddy_data:
+  caddy_config:

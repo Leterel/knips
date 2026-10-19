@@ -27,7 +27,9 @@ npm start
 Dann diese Adresse in der APK eintragen. Android-Build: [ANDROID.md](ANDROID.md).
 Für externe Geräte braucht ihr einen selbst gehosteten erreichbaren HTTPS-Server:
 `PUBLIC_ORIGIN=https://eure-domain` setzen und einen TLS-Reverse-Proxy vor den lokalen
-Node-Port schalten. Host und Origin müssen übereinstimmen. Keine Bereitstellung enthalten.
+Node-Port schalten. Host und Origin müssen übereinstimmen. Dafür enthält
+[DEPLOYMENT.md](DEPLOYMENT.md) einen Docker-Compose-Weg mit Caddy-TLS,
+privater Einladungskonfiguration, Datensicherung und Wiederherstellung.
 
 ## Tests
 
@@ -88,7 +90,10 @@ Browserprüfung: `node test/moderation-browser.mjs` mit derselben Playwright-Ein
   garantiert keine Metadatenentfernung für fremde Clients.
 - Kein AdMob und keine Store-Freigabe. Ein unsigniertes, validiertes AAB existiert.
   Betreiberangaben,
-  Datenschutzerklärung und öffentliche Löschmöglichkeit müssen vor Veröffentlichung ergänzt werden.
+  Datenschutzerklärung und die öffentliche Domain müssen vor Veröffentlichung ergänzt werden.
+  Die anonyme Seite `/delete-account` verlinkt zur bestehenden passwortbestätigten
+  Kontolöschung im Browser, ohne dass die Android-App installiert sein muss.
+  Betreiberkontakt und Sicherungsaufbewahrung müssen für den realen Betrieb festgelegt werden.
 - Entwicklungs-APK; Signaturschlüssel und Nutzerdaten bleiben außerhalb von Git.
 
 Aktuelle Prüfergebnisse: [PROGRESS.md](PROGRESS.md).

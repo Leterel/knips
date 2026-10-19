@@ -1,5 +1,5 @@
 const $ = selector => document.querySelector(selector);
-let me = null, mode = 'register', next = null, profileUser = null, selectedPhoto = null, previewUrl = null, routeVersion = 0;
+let me = null, mode = new URLSearchParams(location.search).get('account') === 'delete' ? 'login' : 'register', next = null, profileUser = null, selectedPhoto = null, previewUrl = null, routeVersion = 0;
 let messageTimer;
 let registration = 'open';
 const inviteLabel = document.createElement('label'), inviteInput = document.createElement('input');

@@ -1,0 +1,10 @@
+{$KNIPS_DOMAIN} {
+    encode zstd gzip
+    header Strict-Transport-Security "max-age=31536000"
+    request_body {
+        max_size 12MB
+    }
+    reverse_proxy knips:8790 {
+        header_up X-Knips-Client-IP {remote_host}
+    }
+}

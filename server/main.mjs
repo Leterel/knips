@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { isIP } from 'node:net';
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, createHash, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
@@ -12,7 +13,7 @@ const derive = promisify(scrypt);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const JSON_LIMIT = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 16_384;
-const publicFiles = new Map([['/', ['index.html', 'text/html; charset=utf-8']], ['/app.js', ['app.js', 'text/javascript; charset=utf-8']], ['/style.css', ['style.css', 'text/css; charset=utf-8']], ['/icon.svg', ['icon.svg', 'image/svg+xml']]]);
+const publicFiles = new Map([['/delete-account', ['delete-account.html', 'text/html; charset=utf-8']], ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.js', ['app.js', 'text/javascript; charset=utf-8']], ['/style.css', ['style.css', 'text/css; charset=utf-8']], ['/icon.svg', ['icon.svg', 'image/svg+xml']]]);
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
 const hash = value => createHash('sha256').update(value).digest('hex');
 const userView = user => ({ id: user.id, username: user.username, displayName: user.display_name });
@@ -38,7 +39,7 @@ function reply(res, status, value) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(value));
 }
 
-export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigin = '', secureCookies = publicOrigin.startsWith('https:'), moderatorUsernames = [], registration = 'open', invitationCode = '', now = () => Date.now() } = {}) {
+export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigin = '', secureCookies = publicOrigin.startsWith('https:'), moderatorUsernames = [], registration = 'open', invitationCode = '', trustProxy = false, now = () => Date.now() } = {}) {
   if (!['open', 'invite', 'closed'].includes(registration)) throw Error('KNIPS_REGISTRATION muss open, invite oder closed sein.');
   if (registration === 'invite' && (typeof invitationCode !== 'string' || invitationCode.length < 16 || invitationCode.length > 256)) throw Error('Für Einladungen wird ein Code mit 16 bis 256 Zeichen benötigt.');
   if (!Array.isArray(moderatorUsernames) || moderatorUsernames.some(name => !/^[a-z0-9_]{3,24}$/.test(name))) throw Error('Ungültige Moderatorenliste.');
@@ -81,7 +82,9 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
   const sessionUser = user => ({ ...userView(user), moderator: moderators.has(user.id) });
   const rates = new Map();
   function rate(req, group, max, windowMs = 15 * 60 * 1000) {
-    const key = `${group}:${req.socket.remoteAddress}`, stamp = now();
+    const forwarded = req.headers['x-knips-client-ip'];
+    const address = trustProxy && typeof forwarded === 'string' && isIP(forwarded) ? forwarded : req.socket.remoteAddress;
+    const key = `${group}:${address}`, stamp = now();
     for (const [k, bucket] of rates) if (bucket.until <= stamp) rates.delete(k);
     let bucket = rates.get(key);
     if (!bucket) { if (rates.size >= 2048) fail(429, 'Gerade ist viel los. Bitte später erneut versuchen.'); bucket = { count: 0, until: stamp + windowMs }; rates.set(key, bucket); }
@@ -315,7 +318,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const host = process.env.HOST || '127.0.0.1', port = Number(process.env.PORT || 8790), publicOrigin = process.env.PUBLIC_ORIGIN || '';
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('PORT muss zwischen 1 und 65535 liegen.');
   if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !publicOrigin) throw Error('Bei Netzwerkzugriff ist PUBLIC_ORIGIN erforderlich. Für öffentliche Server HTTPS verwenden.');
-  const app = await createKnips({ dataDir: process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : undefined, publicOrigin, moderatorUsernames: (process.env.KNIPS_MODERATORS || '').split(',').map(name => name.trim()).filter(Boolean), registration: process.env.KNIPS_REGISTRATION || 'open', invitationCode: process.env.KNIPS_INVITATION_CODE || '' });
+  const app = await createKnips({ dataDir: process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : undefined, publicOrigin, moderatorUsernames: (process.env.KNIPS_MODERATORS || '').split(',').map(name => name.trim()).filter(Boolean), registration: process.env.KNIPS_REGISTRATION || 'open', invitationCode: process.env.KNIPS_INVITATION_CODE || '', trustProxy: process.env.KNIPS_TRUST_PROXY === '1' });
   try {
     await new Promise((resolveListen, reject) => {
       app.server.once('error', reject);

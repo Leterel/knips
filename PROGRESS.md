@@ -88,3 +88,35 @@ Chrome-Browserprüfung mit synthetischem Bild bestanden: Registrierung, Neukodie
 Upload, sichere Beschriftung, Sitzung nach Reload, Like, Kommentar, mobile Ansicht
 und Kontolöschung. Der erste Sandbox-Lauf scheiterte an Loopback-EACCES; derselbe
 Testlauf außerhalb bestand. Kein neuer Android- oder öffentlicher HTTPS-Test.
+
+## 19.10.2026 — HTTPS-Paket und öffentliche Kontolöschung
+
+Echten selbst hostbaren Compose-Stack ergänzt: nicht privilegierter Node-Container,
+schreibgeschütztes Programmverzeichnis, isoliertes Backend ohne veröffentlichten
+App-Port, persistente Daten-/TLS-Volumes, Caddy mit automatischem TLS. Neuer
+Konfigurationsgenerator erstellt exklusiv eine private `.env` mit zufälligem
+256-Bit-Einladungscode; lehnt ungeeignete Domain-/Konfigurations-Eingaben ab und
+überschreibt keine vorhandenen Dateien. Deployment-, Update-, Backup- und
+Restore-Ablauf in DEPLOYMENT.md beschrieben. Docker Compose akzeptiert die
+Konfiguration (`config --quiet`); Linux-Docker-Daemon hier nicht gestartet,
+deshalb Container-Build und öffentliche Zertifikatserteilung nicht ausgeführt.
+
+Proxy-Ratenbegrenzung korrigiert: der isolierte Caddy übergibt eine überschriebene
+Client-IP; normales lokales Knips vertraut fremden IP-Headern weiterhin nicht.
+Tests prüfen getrennte IP-Limits, manipulierte Header und ungültige Adressen.
+Container-Healthcheck prüft den realen Knips-Health-Endpunkt mit dem öffentlichen
+Host und Knips-Kennung, einschließlich Negativtest mit falschem Host.
+
+Neue öffentlich erreichbare Seite `/delete-account`: Erklärung der gelöschten
+Daten und verbleibender Sicherungen/Moderatorschutzmarkierung, Link zur Anmeldung
+direkt ins eigene Profil. Dort bleibt das bestehende passwortbestätigte Löschen
+maßgeblich. Kein Android-Download nötig. Aktuelle offizielle Google-Play-Vorgabe
+geprüft: https://support.google.com/googleplay/android-developer/answer/13327111?hl=en
+Noch keine Store-Freigabe: Betreiberkontakt, Sicherungsaufbewahrung und echte
+öffentliche Domain bleiben Betreiberentscheidungen.
+
+Node 24.19.0: **18/18 Tests bestanden** außerhalb der Loopback-blockierenden
+Sandbox. Chrome-Smoketest mit synthetischem Foto bestanden, jetzt zusätzlich
+anonyme Löschseite, korrekter Anmeldemodus, mobiler Überlaufcheck und Link von der
+Löschseite bis zur tatsächlichen bestätigten Kontolöschung. Mobile Löschseite
+anhand Screenshot visuell geprüft. Kein physisches Gerät verwendet.

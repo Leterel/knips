@@ -5,3 +5,5 @@
 .moderation{flex-basis:100%;min-width:0}.moderation-report{border-top:1px solid #dfd4cf;padding:16px 0;overflow-wrap:anywhere}.moderation-report p{margin:8px 0}.moderation-report button{margin-right:18px}
 
 .moderation-image{display:block;max-width:100%;max-height:320px;object-fit:contain;margin:12px 0}
+
+.deletion-page{max-width:760px;margin:40px auto;padding:24px;line-height:1.7}.deletion-page h1{font-size:clamp(2rem,6vw,3rem)}.deletion-page h2{margin-top:28px}.deletion-page li{margin:12px 0}.deletion-page .primary{display:inline-block}.account-help{text-align:center;padding:24px;font-size:14px}
