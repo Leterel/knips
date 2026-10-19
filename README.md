@@ -29,6 +29,23 @@ Node-Port schalten. Host und Origin müssen übereinstimmen. Keine Bereitstellun
 
 ## Tests
 
+### Einen laufenden Server prüfen
+
+```powershell
+$env:KNIPS_SERVER_URL='https://deine-knips-domain.example'
+node tools/check-server.mjs
+```
+
+Prüft Knips-Kennung, Registrierungsmodus und anonyme Sitzung, ohne Konten,
+Fotos oder Anmeldesitzungen anzulegen. HTTPS ist vorgeschrieben; für lokale
+Tests sind `http://127.0.0.1:8790`, `http://localhost:8790` und IPv6-Loopback erlaubt.
+Weiterleitungen, ungültige Zertifikate, fremde Loginportale, übergroße Antworten
+und ausbleibende Antworten gelten als Fehler. Exitcode 0 bedeutet erreichbar,
+Exitcode 1 fehlgeschlagen. Dies ersetzt keinen echten Upload-/Browsertest.
+Ältere Server ohne Knips-Kennung in `/health` zuerst aktualisieren.
+
+### Automatisierte Tests
+
 ```sh
 npm test
 ```

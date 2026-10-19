@@ -132,7 +132,7 @@ export async function createKnips({ dataDir = resolve(root, 'data'), publicOrigi
         const [name, mime] = publicFiles.get(path); const body = await readFile(join(root, 'public', name));
         res.writeHead(200, { 'Content-Type': mime, 'Content-Length': body.length }); return res.end(req.method === 'HEAD' ? undefined : body);
       }
-      if (path === '/health' && req.method === 'GET') return reply(res, 200, { ok: true });
+      if (path === '/health' && req.method === 'GET') return reply(res, 200, { ok: true, service: 'knips' });
       if (path === '/api/config' && req.method === 'GET') return reply(res, 200, { registration });
       if (path === '/api/register' && req.method === 'POST') {
         rate(req, 'register', 8); const data = await readJson(req);

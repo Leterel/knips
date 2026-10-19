@@ -1,5 +1,14 @@
 # Fortschritt — 2026-10-01
 
+## 19.10.2026 — Erreichbarkeit prüfen
+
+Neues Werkzeug `tools/check-server.mjs` prüft einen laufenden Knips-Server ohne
+Schreibzugriffe. HTTPS außer Loopback, feste Zeit-/Antwortgrößenlimits und keine
+Weiterleitungen. Health-Antwort nennt jetzt den Dienst. Fremde Server,
+fehlerhafte Konfiguration/Sitzungen und hängende Antworten werden abgelehnt.
+Alle 15 Backend-, Backup- und Serverprüfungen bestanden, ausschließlich lokal
+mit synthetischen Daten. Ein öffentlicher HTTPS-Server ist weiterhin nicht getestet.
+
 ## 17.10.2026 — Datenbetrieb
 
 Offline-Backup und Wiederherstellung implementiert: Datenbank plus referenzierte
