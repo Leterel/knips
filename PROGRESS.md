@@ -78,3 +78,13 @@ Die Moderations- und Browserabläufe bestehen nach dieser Änderung erneut.
 
 Zusätzlich wurde ein unsigniertes Android-AAB gebaut (11.875 Bytes). BundleConfig,
 Manifest, DEX und Ressourcen sind vorhanden. Kein Play-Upload oder Produktionsschlüssel.
+
+## 19.10.2026 — Eigener Ersttest und erneute Regression
+
+ERSTTEST.md ergänzt: lokaler Browserablauf mit getrenntem zufälligem Testdatenordner,
+Android-Emulator-Adresse und klare HTTPS-Voraussetzung für externe Geräte.
+Node 24.19.0: alle 15 Backend-/Backup-/Servertests erneut bestanden.
+Chrome-Browserprüfung mit synthetischem Bild bestanden: Registrierung, Neukodierung,
+Upload, sichere Beschriftung, Sitzung nach Reload, Like, Kommentar, mobile Ansicht
+und Kontolöschung. Der erste Sandbox-Lauf scheiterte an Loopback-EACCES; derselbe
+Testlauf außerhalb bestand. Kein neuer Android- oder öffentlicher HTTPS-Test.

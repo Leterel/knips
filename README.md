@@ -1,5 +1,7 @@
 # Knips
 
+Erster eigener Test: [Kurzanleitung](ERSTTEST.md).
+
 Kleine selbst hostbare Foto-App mit Android-Client. Konten, Foto-Feed, Profile,
 Likes, Kommentare, eigene Beiträge löschen, Melden, Blockieren und Kontolöschung.
 Prototyp für einen kleinen vertrauenswürdigen Nutzerkreis; kein fertiger öffentlicher Dienst.
