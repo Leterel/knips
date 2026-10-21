@@ -8,7 +8,7 @@ Server und funktioniert nicht als unabhängiges soziales Netzwerk ohne Backend.
 ## Starten
 
 1. Den Server nach [README.md](README.md) starten.
-2. `knips-0.1.0.apk` auf Android 8 oder neuer installieren und öffnen.
+2. `knips-0.1.1.apk` auf Android 8 oder neuer installieren und öffnen.
 3. Über **Server** die HTTPS-Adresse eintragen. Konto erstellen oder anmelden.
 4. Ein Foto über die System-Dateiauswahl auswählen, beschriften und veröffentlichen.
 
@@ -33,7 +33,7 @@ Build-Tools 36.0.0. Keine Gradle- oder zusätzliche Android-Bibliotheken nötig.
 ./android/build.ps1 -SdkPath 'C:/Android/Sdk' -JavaHome 'C:/Program Files/Java/jdk-21'
 ```
 
-Ergebnis: `android/build/outputs/knips-0.1.0.apk`. Der Build prüft zuerst
+Ergebnis: `android/build/outputs/knips-0.1.1.apk`. Der Build prüft zuerst
 24 Serveradressen-/Navigationsfälle, anschließend Signatur und ZIP-Alignment.
 Der Entwicklungsschlüssel unter `android/build/debug.keystore` bleibt lokal
 und muss für spätere Updates bewahrt werden. Buildordner und Schlüssel gehören

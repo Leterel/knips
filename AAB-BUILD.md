@@ -1,3 +1,14 @@
+# Android-App-Bundle — aktueller Stand 21.10.2026
+
+Client 0.1.1 lässt sich mit android/build-bundle.ps1 als unsigniertes AAB bauen.
+Geprüft: Gradle 8.11.1, AGP 8.10.1, JDK 21, SDK/Build-Tools 36, bundletool 1.18.3.
+Die frühere AGP-/API 36-Warnung ist durch das getestete Upgrade erledigt.
+Das Skript verwendet neue Ausgabeordner, prüft Paketname/Signaturfreiheit und
+validiert mit bundletool. Signierweg für eigene Uploadschlüssel: [SIGNING.md](SIGNING.md).
+Es gibt weiterhin keinen Play-Upload und keine Store-Zulassung.
+
+## Historische Build-Belege
+
 # Android-App-Bundle — 07.10.2026
 
 Der native WebView-Client lässt sich als unsigniertes AAB bauen. Der Server bleibt

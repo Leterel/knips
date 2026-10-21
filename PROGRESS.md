@@ -120,3 +120,23 @@ Sandbox. Chrome-Smoketest mit synthetischem Foto bestanden, jetzt zusätzlich
 anonyme Löschseite, korrekter Anmeldemodus, mobiler Überlaufcheck und Link von der
 Löschseite bis zur tatsächlichen bestätigten Kontolöschung. Mobile Löschseite
 anhand Screenshot visuell geprüft. Kein physisches Gerät verwendet.
+
+## 21.10.2026 — Android 0.1.1 und Upload-Signierweg
+
+Android-Client auf Version 0.1.1/Code 2 aktualisiert. Release-Linter meldete
+fehlende includeSubdomains-Angaben: explizit false für die drei erlaubten
+Loopback-/Emulatorhosts ergänzt. Keine neue HTTP-Freigabe für externe Domains.
+Gradle 8.11.1 mit SHA256 und AGP 8.10.1 eingesetzt; API 36-Build ohne frühere
+AGP-Kompatibilitätswarnung, bundletool-Validierung bestanden.
+Neues android/build-bundle.ps1 exportiert ausschließlich unsigned AAB in neue
+Belegordner. tools/sign-bundle.mjs prüft eigene Uploadsignaturen separat;
+alle 21 Backend-/Deployment-/Signierprüfungen mit echtem Bundle bestanden.
+Manueller APK-Build: 24 Adress-/Navigationsfälle, V2/V3 und Alignment bestanden.
+APK-SHA256: 575FCEA1FC464733EC75C42DBE5BC664B3335362F0807E8B3432F2C78E7E95B2.
+Der Bundleclient besteht Start/Serverauswahl auf API 34-QEMU; kein neuer öffentlicher
+HTTPS- oder Android-Uploadnachweis. Keine Produktionsschlüssel erstellt.
+Store-Texte, eigene Vektorgrafiken und Datenschutz-Arbeitsgrundlage unter store/;
+Betreiberkontakt, Privacy-URL und tatsächliche Hostingdaten bleiben offen.
+
+Zusätzlich besteht derselbe AAB-Client Start und Serverauswahl auf API 36/QEMU
+emulator-5582. Hash im Belegpaket, keine neue Android-Uploadprüfung behauptet.

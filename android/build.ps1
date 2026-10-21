@@ -56,7 +56,7 @@ Run-Checked (Join-Path $buildTools 'zipalign.exe') @('-f','-p','4',(Join-Path $b
 if (!(Test-Path -LiteralPath $KeyStorePath)) {
     Run-Checked (Join-Path $javaBin 'keytool.exe') @('-genkeypair','-keystore',$KeyStorePath,'-storepass','android','-keypass','android','-alias','androiddebugkey','-dname','CN=Knips Development,O=Leterel,C=DE','-keyalg','RSA','-keysize','2048','-validity','10000','-noprompt')
 }
-$apk = Join-Path $OutputDirectory 'knips-0.1.0.apk'
+$apk = Join-Path $OutputDirectory 'knips-0.1.1.apk'
 Run-Checked (Join-Path $javaBin 'java.exe') @('-jar',(Join-Path $buildTools 'lib\apksigner.jar'),'sign','--ks',$KeyStorePath,'--ks-pass','pass:android','--key-pass','pass:android','--ks-key-alias','androiddebugkey','--out',$apk,(Join-Path $build 'aligned.apk'))
 Run-Checked (Join-Path $javaBin 'java.exe') @('-jar',(Join-Path $buildTools 'lib\apksigner.jar'),'verify','--verbose',$apk)
 Run-Checked (Join-Path $buildTools 'zipalign.exe') @('-c','-v','4',$apk)
