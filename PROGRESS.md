@@ -140,3 +140,13 @@ Betreiberkontakt, Privacy-URL und tatsächliche Hostingdaten bleiben offen.
 
 Zusätzlich besteht derselbe AAB-Client Start und Serverauswahl auf API 36/QEMU
 emulator-5582. Hash im Belegpaket, keine neue Android-Uploadprüfung behauptet.
+
+## 21.10.2026 — Docker-Laufzeit konkret geprüft, Hostengine blockiert
+
+Vorhandenen Docker CLI29.8/Compose5.5.1 und beide vorhandenen Kontexte geprüft.
+Docker Desktop einmal ohne Änderungen im Hintergrund gestartet; Backend beendet
+sich vor Enginebereitschaft wegen nicht zugreifbarem sailor-ingest.sock beim
+Umbenennen in .stale. Ubuntu/WSL hat keine alternative installierte Engine oder
+Docker-Socket. Kein Image/Container/Volume gestartet oder gelöscht, keine Ports
+geöffnet, kein Reset/Neuinstallation. Containerbuild/Health/Persistenz und
+öffentliches TLS bleiben deshalb unbestätigt. Details: CONTAINER-CHECK-20261021.md.

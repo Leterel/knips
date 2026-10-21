@@ -108,6 +108,13 @@ läuft kein Docker-Linux-Daemon. Container-Build, Caddy-Start, DNS, Zertifikatse
 und echte externe HTTPS-/Android-Verbindungen sind deshalb noch nicht praktisch
 bestätigt. Ohne eigene Domain und Server ist der öffentliche Betrieb weiterhin offen.
 
+Am 21.10.2026 erneut tatsächlich geprüft: Docker Desktop ist installiert,
+sein Backend beendet sich jedoch vor Enginebereitschaft beim Zugriff auf
+`sailor-ingest.sock`. Auch der zweite Docker-Kontext und Ubuntu/WSL bieten
+keine erreichbare eigenständige Engine. Es wurden keine Container/Volumes
+oder öffentlichen Ports angelegt. Vollständiger Befund:
+[CONTAINER-CHECK-20261021.md](CONTAINER-CHECK-20261021.md).
+
 Für die spätere Play-Console-Angabe ist die eigene HTTPS-Adresse mit
 `/delete-account` vorgesehen. Die Seite ist ohne Anmeldung erreichbar und führt
 zur geschützten Browser-Kontolöschung. Vor Veröffentlichung Betreiberkontakt,
