@@ -162,3 +162,8 @@ Zwei gleichzeitig laufende Testserver, reale Health-/Seiten-/Konfigurationsabruf
 Unverändertheit vorhandener Daten, Ende der Erreichbarkeit und freigegebene
 Datenordnersperre geprüft. Alle 22 Backend-/Deployment-/Signier-/Demotests bestanden.
 Keine neue öffentliche Bereitstellung und keine weitere Docker-Systemänderung.
+
+Lokale .env-Varianten, Upload-Schlüssel sowie die in den Anleitungen verwendeten
+Backup-/Restoreordner werden jetzt zusätzlich durch .gitignore geschützt.
+Git-Regeln an Beispielpfaden geprüft; eigene Store-Quellen bleiben erfassbar.
+Es wurden keine echten Schlüssel oder Nutzerbackups geöffnet oder angelegt.

@@ -11,3 +11,18 @@ android/app/build/
 android/local.properties
 *.keystore
 *.jks
+
+# Local deployment variants, upload keys, and private database/backup data
+.env.*
+!.env.example
+!.env.sample
+*.p12
+*.pfx
+*.key
+*.pem
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+backup-*/
+backups/
+restored-data/
