@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "description": "Eine kleine selbst hostbare Foto-App für Freunde.",
-  "engines": { "node": ">=24.14.0 <25" },
-  "scripts": { "start": "node server/main.mjs", "test": "node --test test/*.test.mjs" }
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "scripts": {
+    "start": "node server/main.mjs",
+    "test": "node --test test/*.test.mjs",
+    "demo": "node tools/demo.mjs"
+  }
 }

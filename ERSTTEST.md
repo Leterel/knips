@@ -1,6 +1,14 @@
 # Knips zum ersten Mal ausprobieren
 
-## Am Windows-PC im Browser
+## Schnellster Browser-Test
+
+`Start-Demo.cmd` doppelt anklicken oder im Repository `npm run demo` ausführen.
+Die vom Terminal angezeigte Adresse öffnen und unten ab Schritt 1 testen. Die Demo
+verwendet einen freien Port und neue Testdaten, keine vorhandenen Konten/Fotos.
+Strg+C schließt den Server; der angezeigte Testordner bleibt erhalten. Dieser
+Modus ist nur auf dem eigenen PC erreichbar und nicht für den Android-Emulator.
+
+## Am Windows-PC mit festem Port / für den Emulator
 
 Node.js 24.14 oder neuer aus der 24er Reihe verwenden. In diesem Repository ein
 neues PowerShell-Terminal öffnen. Ein eigener zufälliger Testdatenordner erhält

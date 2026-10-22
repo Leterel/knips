@@ -6,6 +6,16 @@ Kleine selbst hostbare Foto-App mit Android-Client. Konten, Foto-Feed, Profile,
 Likes, Kommentare, eigene Beiträge löschen, Melden, Blockieren und Kontolöschung.
 Prototyp für einen kleinen vertrauenswürdigen Nutzerkreis; kein fertiger öffentlicher Dienst.
 
+## Schnell ausprobieren, ohne bestehende Daten
+
+`Start-Demo.cmd` doppelt anklicken oder `npm run demo` ausführen. Die angezeigte
+lokale Adresse im Browser öffnen. Keine npm-Installation und keine Konfiguration
+nötig; Node.js 24.14 oder neuer aus der 24er Reihe verwenden.
+Jeder Start erzeugt einen eigenen Testdatenordner und freien Loopback-Port,
+unabhängig von bestehenden Server-Umgebungsvariablen. Strg+C beendet den
+Testserver. Der Testordner bleibt erhalten; ein späterer Demo-Start beginnt neu.
+Für normalen dauerhaften Betrieb den folgenden Startweg verwenden.
+
 ## Lokal starten
 
 Node.js 24.14 oder neuer aus der 24er Reihe installieren. Keine Server-Abhängigkeiten nötig.

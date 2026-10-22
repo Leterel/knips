@@ -150,3 +150,15 @@ Umbenennen in .stale. Ubuntu/WSL hat keine alternative installierte Engine oder
 Docker-Socket. Kein Image/Container/Volume gestartet oder gelöscht, keine Ports
 geöffnet, kein Reset/Neuinstallation. Containerbuild/Health/Persistenz und
 öffentliches TLS bleiben deshalb unbestätigt. Details: CONTAINER-CHECK-20261021.md.
+
+## 22.10.2026 — Einfache lokale Testinstanz
+
+Neuer Start-Demo.cmd / npm run demo startet einen echten Knips-Server auf
+einem freien IPv4-Loopback-Port mit eigenem neuem Testdatenordner. Vorhandene
+DATA_DIR-, HOST-, PUBLIC_ORIGIN-, Moderator- und Registrierungsvariablen
+werden in diesem Modus nicht übernommen; echte Daten werden nicht geöffnet.
+Testdaten bleiben nach dem Schließen erhalten, jeder Start ist eine neue Instanz.
+Zwei gleichzeitig laufende Testserver, reale Health-/Seiten-/Konfigurationsabrufe,
+Unverändertheit vorhandener Daten, Ende der Erreichbarkeit und freigegebene
+Datenordnersperre geprüft. Alle 22 Backend-/Deployment-/Signier-/Demotests bestanden.
+Keine neue öffentliche Bereitstellung und keine weitere Docker-Systemänderung.
