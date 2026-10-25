@@ -2,6 +2,9 @@
 
 Erster eigener Test: [Kurzanleitung](ERSTTEST.md).
 
+[Android 0.1.1 und aktuelle Backend-Quellen herunterladen](https://github.com/Leterel/knips/releases/tag/v0.1.1).
+Die APK benötigt einen laufenden eigenen Knips-Server; sie enthält kein Backend.
+
 Kleine selbst hostbare Foto-App mit Android-Client. Konten, Foto-Feed, Profile,
 Likes, Kommentare, eigene Beiträge löschen, Melden, Blockieren und Kontolöschung.
 Prototyp für einen kleinen vertrauenswürdigen Nutzerkreis; kein fertiger öffentlicher Dienst.
