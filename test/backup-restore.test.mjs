@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { createKnips } from '../server/main.mjs';
 import { backupData } from '../tools/backup.mjs';
 import { restoreData } from '../tools/restore.mjs';
+import { checkBackup, fileDigest } from '../tools/backup-check.mjs';
 
 const password = 'synthetic-backup-password';
 const image = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6sYkAAAAASUVORK5CYII=';
@@ -71,6 +72,35 @@ test('corrupt/incomplete/path-traversing backups are rejected before restoration
   await writeFile(join(copy, 'photos', JSON.parse(original).files[1].path.split('/')[1]), 'bad image');
   await assert.rejects(restoreData(copy, join(f.root, 'invalid')), /verändert/);
   assert.equal((await readdir(f.root)).includes('invalid'), false);
+});
+
+test('backup check verifies real files without restoring or changing saved content', async t => {
+  const f=await fixture(t),copy=join(f.root,'backup');await f.close();
+  await backupData(f.dataDir,copy);
+  const manifestPath=join(copy,'backup.json'),raw=await readFile(manifestPath,'utf8');
+  const manifest=JSON.parse(raw),entries=await readdir(copy);
+  const before=await Promise.all(manifest.files.map(file=>fileDigest(join(copy,file.path))));
+  const expected={passed:true,format:1,photos:1,files:2,sessionsIncluded:false};
+  assert.deepEqual(await checkBackup(copy),expected);
+  assert.deepEqual(await checkBackup(copy),expected);
+  assert.deepEqual(await readdir(copy),entries);
+  assert.equal(await readFile(manifestPath,'utf8'),raw);
+  assert.deepEqual(await Promise.all(manifest.files.map(file=>fileDigest(join(copy,file.path)))),before);
+  const cli=await run(process.execPath,[resolve('tools/backup-check.mjs'),copy],{timeout:10000});
+  assert.deepEqual(JSON.parse(cli.stdout),expected);
+  assert.ok(!cli.stdout.includes('alice')&&!cli.stdout.includes(password)&&!cli.stdout.includes(f.root));
+  for(const altered of ['null','{',JSON.stringify({...manifest,files:[...manifest.files,manifest.files[0]]}),JSON.stringify({...manifest,files:[{path:'../outside',sha256:'0'.repeat(64)}]})]) {
+    await writeFile(manifestPath,altered);
+    await assert.rejects(checkBackup(copy));
+    assert.ok(!(await readdir(copy)).includes('.knips.lock'));
+  }
+  await writeFile(manifestPath,raw);
+  await writeFile(join(copy,'INCOMPLETE'),'partial');
+  await assert.rejects(checkBackup(copy),/Unvollständiges/);await unlink(join(copy,'INCOMPLETE'));
+  await writeFile(join(copy,'photos',manifest.files[1].path.split('/')[1]),'corrupted');
+  await assert.rejects(checkBackup(copy),/verändert/);
+  await assert.rejects(run(process.execPath,[resolve('tools/backup-check.mjs'),copy],{timeout:10000}),error=>error.code===1&&error.stderr.includes('Backupprüfung fehlgeschlagen'));
+  assert.deepEqual(await readdir(f.root),['backup','data']);
 });
 
 test('failed server startup releases its data lock', async t => {

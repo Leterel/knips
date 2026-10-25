@@ -167,3 +167,19 @@ Lokale .env-Varianten, Upload-Schlüssel sowie die in den Anleitungen verwendete
 Backup-/Restoreordner werden jetzt zusätzlich durch .gitignore geschützt.
 Git-Regeln an Beispielpfaden geprüft; eigene Store-Quellen bleiben erfassbar.
 Es wurden keine echten Schlüssel oder Nutzerbackups geöffnet oder angelegt.
+
+## 25.10.2026 — prüfbare Sicherungen ohne Wiederherstellung
+
+Neuer Backup-Check mit denselben Prüfungen wie Restore. SHA256 liest Dateien
+stückweise, statt ganze Datenbanken/Fotos gleichzeitig im RAM zu halten.
+Die SQLite-Prüfung läuft auf einer eigenen temporären Datenbankkopie: auch alte
+WAL-formatierte Sicherungen erhalten dadurch keine zusätzlichen WAL/SHM-Dateien.
+Verknüpfte Manifestdateien werden abgelehnt. Manifest und Kontenformat bleiben v1;
+keine Änderung der Android-APK oder Server-API.
+
+21 ausführbare Node-Checks bestanden, 2 unveränderte Signier-Integrationstests in
+diesem Lauf mangels optionaler Testfixture übersprungen. Neuer Check testet echte
+synthetische Sicherung, identische Dateiinhalte und Ordnerliste vor/nach Prüfung,
+CLI-Erfolg/-Fehler, beschädigte/duplizierte/path-traversierende Manifestdaten und
+Fotokorruption. Echte Wiederherstellung erhält Konto/Fotobytes und widerruft alte
+Sitzungen weiterhin. Keine echten Nutzerdaten verwendet.

@@ -120,3 +120,10 @@ Für die spätere Play-Console-Angabe ist die eigene HTTPS-Adresse mit
 zur geschützten Browser-Kontolöschung. Vor Veröffentlichung Betreiberkontakt,
 konkrete Sicherungsaufbewahrung und Datenschutzerklärung ergänzen. Die Seite
 ersetzt keine Store-Prüfung. Grundlage: [Google Play: Account deletion requirements](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en), geprüft am 19.10.2026.
+
+Vor einem Restore kann das Backup ohne Zielordner geprüft werden:
+`node tools/backup-check.mjs /backups/vor-update-2026-10-19` im selben
+Wartungscontainer ausführen. Die Sicherung muss für die temporäre Wartungssperre
+beschreibbar sein. Danach gilt weiterhin die Probe-Anmeldung/Foto-Prüfung im
+wiederhergestellten Server. Dieser Befehl ist lokal getestet; kein neuer
+Containerlauf oder öffentlicher Servernachweis wird damit behauptet.

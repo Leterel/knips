@@ -114,6 +114,7 @@ Server beenden, dann mit Node 24 eine neue Sicherung erstellen:
 
 ```sh
 node tools/backup.mjs ./data ./backup-2026-10-17
+node tools/backup-check.mjs ./backup-2026-10-17
 node tools/restore.mjs ./backup-2026-10-17 ./restored-data
 ```
 
@@ -131,3 +132,19 @@ eine `.knips.lock`-Datei; Sicherungen während des Serverbetriebs werden abgeleh
 Nach einem Absturz erst sicherstellen, dass kein Knips-Prozess diesen Ordner
 verwendet, dann eine zurückgebliebene `.knips.lock` manuell entfernen. Die Sperre
 wird absichtlich nicht allein anhand einer möglicherweise wiederverwendeten PID entfernt.
+
+### Sicherung prüfen, ohne sie wiederherzustellen
+
+`node tools/backup-check.mjs BACKUPORDNER` prüft Manifest, SHA256 jeder Datei,
+SQLite-Integrität und Fremdschlüssel, leere Sitzungen sowie die Übereinstimmung
+zwischen Fotoliste und Datenbank. Exitcode 0 und `passed:true` bedeuten bestanden;
+Fehler liefern Exitcode 1. Der Bericht nennt nur Format und Anzahl von Dateien/
+Fotos, keine Kontonamen, Passworthashes oder Fotoinhalte. Es entsteht kein
+Wiederherstellungsordner. Ziel ist eine eigene Knips-Sicherung, kein fremdes SQL.
+
+Während der Prüfung schützt die übliche temporäre `.knips.lock` vor paralleler
+Wartung; danach wird sie entfernt. Die Datenbank wird in einem eigenen temporären
+Prüfordner gelesen, der anschließend gelöscht wird. Das vermeidet SQLite-WAL-/
+SHM-Hilfsdateien im Backup. Foto-Prüfsummen werden als Datenstrom berechnet.
+Eine erfolgreiche Prüfung ersetzt keine zweite Sicherung oder Probe-Anmeldung
+nach einer echten Wiederherstellung. Restore benutzt dieselbe Prüflogik.
