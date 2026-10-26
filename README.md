@@ -151,3 +151,12 @@ Prüfordner gelesen, der anschließend gelöscht wird. Das vermeidet SQLite-WAL-
 SHM-Hilfsdateien im Backup. Foto-Prüfsummen werden als Datenstrom berechnet.
 Eine erfolgreiche Prüfung ersetzt keine zweite Sicherung oder Probe-Anmeldung
 nach einer echten Wiederherstellung. Restore benutzt dieselbe Prüflogik.
+
+## Automatische Quelltests
+
+GitHub Actions führt bei Push auf main und bei Pull Requests die synthetischen
+Node-Regressionstests unter Ubuntu und Windows mit Node24 aus. Aktionen sind auf
+exakte offizielle Commit-IDs festgelegt, Tokenrechte nur contents:read, keine
+Secrets, keine Artefakt-/Cache-Uploads und keine produktiven Server. Diese Suite
+ersetzt keine Browser-/Android-/Medien-/Signierprüfung. Laufresultate:
+[GitHub Actions](https://github.com/Leterel/knips/actions/workflows/node-tests.yml).
